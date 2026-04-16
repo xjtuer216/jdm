@@ -13,3 +13,11 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+
+# IDE and tool directories
+.claude
+.cursor
+.trellis
+docs/
+AGENTS.md
+CLAUDE.md

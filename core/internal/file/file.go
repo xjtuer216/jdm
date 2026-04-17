@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
-// CreateSymlink creates a symbolic link on Windows
+// CreateSymlink creates a symbolic link on Windows.
+// Falls back to directory junction if symlink fails due to privilege issues.
 func CreateSymlink(target, link string) error {
 	// Remove existing link if exists
 	if _, err := os.Lstat(link); err == nil {
@@ -19,8 +22,36 @@ func CreateSymlink(target, link string) error {
 		}
 	}
 
-	// Use os.Symlink on Windows 10 1703+ with Developer Mode
-	return os.Symlink(target, link)
+	// Try symlink first
+	err := os.Symlink(target, link)
+	if err == nil {
+		return nil
+	}
+
+	// On Windows, fall back to directory junction if privilege error
+	if runtime.GOOS == "windows" {
+		return createJunction(target, link)
+	}
+
+	return err
+}
+
+// createJunction creates a directory junction on Windows using mklink /J.
+// Junctions don't require administrator privileges.
+func createJunction(target, link string) error {
+	// Ensure target is an absolute path
+	absTarget, err := filepath.Abs(target)
+	if err != nil {
+		return fmt.Errorf("failed to resolve target path: %w", err)
+	}
+
+	cmd := exec.Command("cmd", "/c", "mklink", "/J", link, absTarget)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to create junction (%s): %w", strings.TrimSpace(string(output)), err)
+	}
+
+	return nil
 }
 
 // RemoveSymlink removes a symbolic link

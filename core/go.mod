@@ -1,4 +1,4 @@
-module github.com/whimsy/jdm
+module github.com/xjtuer216/jdm
 
 go 1.21
 

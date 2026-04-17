@@ -8,17 +8,21 @@ import (
 
 const (
 	// DefaultMirror 是默认的 Adoptium 镜像地址
-	DefaultMirror = "https://api.adoptium.net/v3"
+	DefaultMirror = "https://api.adoptium.net"
+	// DefaultDownloadMirror 是默认的 JDK 下载镜像/代理地址
+	// 使用 ghproxy.net 代理 GitHub Releases 下载
+	DefaultDownloadMirror = "https://ghproxy.net"
 	// ConfigFileName 是配置文件名
 	ConfigFileName = "config.json"
 )
 
 type Config struct {
-	JDMHome string            `json:"jdm_home"`
-	JDKHome string            `json:"jdk_home"`
-	Mirror  string            `json:"mirror"`
-	Default string            `json:"default"`
-	Aliases map[string]string `json:"aliases"`
+	JDMHome        string            `json:"jdm_home"`
+	JDKHome        string            `json:"jdk_home"`
+	Mirror         string            `json:"mirror"`
+	DownloadMirror string            `json:"download_mirror"`
+	Default        string            `json:"default"`
+	Aliases        map[string]string `json:"aliases"`
 }
 
 // GetConfigPath 获取用户配置文件的路径

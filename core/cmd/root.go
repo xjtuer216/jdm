@@ -6,9 +6,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/whimsy/jdm/internal/config"
-	"github.com/whimsy/jdm/internal/jdk"
-	"github.com/whimsy/jdm/internal/log"
+	"github.com/xjtuer216/jdm/internal/config"
+	"github.com/xjtuer216/jdm/internal/jdk"
+	"github.com/xjtuer216/jdm/internal/log"
 )
 
 var rootCmd = &cobra.Command{

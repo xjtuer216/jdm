@@ -6,11 +6,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"time"
 
-	"github.com/whimsy/jdm/internal/config"
-	"github.com/whimsy/jdm/internal/file"
-	"github.com/whimsy/jdm/internal/web"
+	"github.com/xjtuer216/jdm/internal/config"
+	"github.com/xjtuer216/jdm/internal/file"
+	"github.com/xjtuer216/jdm/internal/web"
 )
 
 type InstalledVersion struct {
@@ -66,6 +68,39 @@ func (vm *VersionManager) ListLocal() ([]InstalledVersion, error) {
 
 // ListRemote lists all available remote JDK versions for a major version
 func (vm *VersionManager) ListRemote(version string) ([]web.RemoteVersion, error) {
+	if version == "" {
+		// Get all available major versions
+		releases, ltsReleases, _, _, err := vm.Client.ListAvailableReleases()
+		if err != nil {
+			return nil, fmt.Errorf("failed to list available releases: %w", err)
+		}
+
+		// Create a set of LTS major versions for quick lookup
+		ltsSet := make(map[int]bool)
+		for _, v := range ltsReleases {
+			ltsSet[v] = true
+		}
+
+		var allVersions []web.RemoteVersion
+		for _, major := range releases {
+			latest, err := vm.Client.GetLatestPerMajor(major)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get latest for major %d: %w", major, err)
+			}
+			if latest != nil {
+				latest.IsLTS = ltsSet[major]
+				allVersions = append(allVersions, *latest)
+			}
+		}
+
+		// Sort by version descending (newest first)
+		sort.Slice(allVersions, func(i, j int) bool {
+			return web.CompareVersions(allVersions[i].Version, allVersions[j].Version) > 0
+		})
+
+		return allVersions, nil
+	}
+
 	majorVersion := vm.parseMajorVersion(version)
 	return vm.Client.FetchVersions(majorVersion)
 }
@@ -282,14 +317,26 @@ func (vm *VersionManager) parseMajorVersion(version string) int {
 }
 
 func (vm *VersionManager) downloadFile(url string, expectedSize int64) (string, error) {
-	resp, err := vm.Client.Client.Get(url)
+	// Use download mirror if configured
+	// Mirror format: prefix the original URL, e.g. "https://ghproxy.net/https://github.com/..."
+	downloadURL := url
+	if vm.Config.DownloadMirror != "" && strings.Contains(url, "github.com") {
+		downloadURL = vm.Config.DownloadMirror + "/" + url
+	}
+
+	// Use a separate client with longer timeout for large file downloads
+	downloadClient := &http.Client{
+		Timeout: 10 * time.Minute,
+	}
+
+	resp, err := downloadClient.Get(downloadURL)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("download failed with status %d", resp.StatusCode)
+		return "", fmt.Errorf("download failed with status %d (URL: %s)", resp.StatusCode, downloadURL)
 	}
 
 	tmpFile, err := os.CreateTemp("", "jdm-*.zip")

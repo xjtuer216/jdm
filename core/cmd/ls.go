@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/whimsy/jdm/internal/jdk"
+	"github.com/xjtuer216/jdm/internal/jdk"
 )
 
 var lsCmd = &cobra.Command{

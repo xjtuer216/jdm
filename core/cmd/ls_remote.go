@@ -3,9 +3,11 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
+	"text/tabwriter"
 
 	"github.com/spf13/cobra"
-	"github.com/whimsy/jdm/internal/jdk"
+	"github.com/xjtuer216/jdm/internal/jdk"
 )
 
 var lsRemoteCmd = &cobra.Command{
@@ -15,7 +17,7 @@ var lsRemoteCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		vm := jdk.NewVersionManager(Cfg)
 
-		version := "17" // default
+		var version string
 		if len(args) > 0 {
 			version = args[0]
 		}
@@ -31,19 +33,36 @@ var lsRemoteCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Printf("Available JDK versions (Java %s):\n", version)
-		for _, v := range versions {
-			lts := ""
-			if isLTS(v.ReleaseName) {
-				lts = " [LTS]"
+		if len(args) == 0 {
+			// Table format for all major versions
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
+			fmt.Fprintf(w, "VERSION\tMAJOR\tLTS\tVENDOR\n")
+			for _, v := range versions {
+				major := ""
+				parts := strings.Split(v.Version, ".")
+				if len(parts) > 0 {
+					major = parts[0]
+				}
+				lts := ""
+				if v.IsLTS {
+					lts = "Yes"
+				}
+				vendor := "Eclipse Adoptium"
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", v.Version, major, lts, vendor)
 			}
-			fmt.Printf("  %s%s\n", v.Version, lts)
+			w.Flush()
+		} else {
+			// Flat list for specific version
+			fmt.Printf("Available JDK versions (Java %s):\n", version)
+			for _, v := range versions {
+				lts := ""
+				if v.IsLTS {
+					lts = " [LTS]"
+				}
+				fmt.Printf("  %s%s\n", v.Version, lts)
+			}
 		}
 	},
-}
-
-func isLTS(releaseName string) bool {
-	return len(releaseName) >= 3 && releaseName[len(releaseName)-3:] == "LTS"
 }
 
 func init() {

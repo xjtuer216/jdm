@@ -7,11 +7,11 @@ import (
 )
 
 // Version 版本号，通过 ldflags 注入
-// 使用方式: go build -ldflags "-X github.com/whimsy/jdm/internal/jdk.Version=1.0.0"
+// 使用方式: go build -ldflags "-X github.com/xjtuer216/jdm/internal/jdk.Version=1.0.0"
 var Version = "dev"
 
 // BuildTime 构建时间，通过 ldflags 注入
-// 使用方式: go build -ldflags "-X github.com/whimsy/jdm/internal/jdk.BuildTime=2024-01-01"
+// 使用方式: go build -ldflags "-X github.com/xjtuer216/jdm/internal/jdk.BuildTime=2024-01-01"
 var BuildTime = "unknown"
 
 // GetVersion 获取当前版本号

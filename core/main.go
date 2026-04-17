@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/whimsy/jdm/cmd"
+	"github.com/xjtuer216/jdm/cmd"
 	"os"
 )
 

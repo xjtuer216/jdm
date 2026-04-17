@@ -43,6 +43,31 @@ type RemoteVersion struct {
 	DownloadURL string `json:"download_url"`
 	FileName    string `json:"file_name"`
 	FileSize    int64  `json:"file_size"`
+	IsLTS       bool   `json:"is_lts"`
+}
+
+// AdoptiumRelease represents a release from the feature_releases API
+type AdoptiumRelease struct {
+	ReleaseName string           `json:"release_name"`
+	Vendor      string           `json:"vendor"`
+	VersionData VersionDataField `json:"version_data"`
+	Binaries    []AdoptiumBinary `json:"binaries"`
+}
+
+// VersionDataField represents version information from the API
+type VersionDataField struct {
+	Semver string `json:"semver"`
+}
+
+// AdoptiumBinary represents a binary in a release
+type AdoptiumBinary struct {
+	Architecture string `json:"architecture"`
+	OS           string `json:"os"`
+	Package      struct {
+		Link string `json:"link"`
+		Name string `json:"name"`
+		Size int64  `json:"size"`
+	} `json:"package"`
 }
 
 type AdoptiumClient struct {
@@ -60,7 +85,7 @@ func NewAdoptiumClient(mirror string) *AdoptiumClient {
 }
 
 func (c *AdoptiumClient) FetchVersions(javaVersion int) ([]RemoteVersion, error) {
-	url := fmt.Sprintf("%s/v3/assets/feature_versions/%d", c.Mirror, javaVersion)
+	url := fmt.Sprintf("%s/v3/assets/feature_releases/%d/ga?image_type=jdk&os=windows&architecture=x64", c.Mirror, javaVersion)
 
 	resp, err := c.Client.Get(url)
 	if err != nil {
@@ -77,31 +102,41 @@ func (c *AdoptiumClient) FetchVersions(javaVersion int) ([]RemoteVersion, error)
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	var featureVersion FeatureVersion
-	if err := json.Unmarshal(body, &featureVersion); err != nil {
+	var releases []AdoptiumRelease
+	if err := json.Unmarshal(body, &releases); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	var versions []RemoteVersion
-	for _, release := range featureVersion.Releases {
-		for _, asset := range release.Assets {
-			// Filter for Windows x64
-			if asset.OS == "windows" && asset.Architecture == "x64" {
-				versions = append(versions, RemoteVersion{
-					Version:     release.Version,
-					ReleaseName: release.ReleaseName,
-					Vendor:      release.Vendor,
-					DownloadURL: asset.Package.Link,
-					FileName:    asset.Package.Name,
-					FileSize:    asset.Package.Size,
-				})
+	// Check if this major version is LTS
+	_, ltsReleases, _, _, err := c.ListAvailableReleases()
+	isLTSVersion := false
+	if err == nil {
+		for _, lts := range ltsReleases {
+			if lts == javaVersion {
+				isLTSVersion = true
+				break
 			}
+		}
+	}
+
+	var versions []RemoteVersion
+	for _, release := range releases {
+		for _, binary := range release.Binaries {
+			versions = append(versions, RemoteVersion{
+				Version:     release.VersionData.Semver,
+				ReleaseName: release.ReleaseName,
+				Vendor:      release.Vendor,
+				DownloadURL: binary.Package.Link,
+				FileName:    binary.Package.Name,
+				FileSize:    binary.Package.Size,
+				IsLTS:       isLTSVersion,
+			})
 		}
 	}
 
 	// Sort by version (newest first)
 	sort.Slice(versions, func(i, j int) bool {
-		return compareVersions(versions[i].Version, versions[j].Version) > 0
+		return CompareVersions(versions[i].Version, versions[j].Version) > 0
 	})
 
 	return versions, nil
@@ -145,6 +180,55 @@ func (c *AdoptiumClient) ListAllVersions() (map[int][]RemoteVersion, error) {
 	return result, nil
 }
 
+// AvailableReleases represents the available releases information from Adoptium API
+type AvailableReleases struct {
+	AvailableReleases        []int `json:"available_releases"`
+	AvailableLTSReleases     []int `json:"available_lts_releases"`
+	MostRecentLTS            int   `json:"most_recent_lts"`
+	MostRecentFeatureVersion int   `json:"most_recent_feature_version"`
+}
+
+// ListAvailableReleases fetches available releases information from Adoptium API
+func (c *AdoptiumClient) ListAvailableReleases() ([]int, []int, int, int, error) {
+	url := fmt.Sprintf("%s/v3/info/available_releases", c.Mirror)
+
+	resp, err := c.Client.Get(url)
+	if err != nil {
+		return nil, nil, 0, 0, fmt.Errorf("failed to fetch available releases: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, nil, 0, 0, fmt.Errorf("API returned status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, nil, 0, 0, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var releases AvailableReleases
+	if err := json.Unmarshal(body, &releases); err != nil {
+		return nil, nil, 0, 0, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return releases.AvailableReleases, releases.AvailableLTSReleases, releases.MostRecentLTS, releases.MostRecentFeatureVersion, nil
+}
+
+// GetLatestPerMajor returns the latest version for a given major version
+func (c *AdoptiumClient) GetLatestPerMajor(majorVersion int) (*RemoteVersion, error) {
+	versions, err := c.FetchVersions(majorVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(versions) == 0 {
+		return nil, fmt.Errorf("no versions available for Java %d", majorVersion)
+	}
+
+	return &versions[0], nil
+}
+
 // ResolveVersion resolves a version string (e.g., "17" -> "17.0.2+2")
 func (c *AdoptiumClient) ResolveVersion(version string) (string, error) {
 	majorVersion := parseVersionNumber(version)
@@ -184,7 +268,7 @@ func parseVersionNumber(version string) int {
 	return major
 }
 
-func compareVersions(v1, v2 string) int {
+func CompareVersions(v1, v2 string) int {
 	parts1 := strings.Split(strings.TrimPrefix(v1, "jdk-"), ".")
 	parts2 := strings.Split(strings.TrimPrefix(v2, "jdk-"), ".")
 

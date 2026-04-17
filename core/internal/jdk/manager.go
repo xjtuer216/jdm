@@ -1,6 +1,7 @@
 package jdk
 
 import (
+	"archive/zip"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/xjtuer216/jdm/internal/config"
 	"github.com/xjtuer216/jdm/internal/file"
+	"github.com/xjtuer216/jdm/internal/progress"
 	"github.com/xjtuer216/jdm/internal/web"
 )
 
@@ -108,6 +110,7 @@ func (vm *VersionManager) ListRemote(version string) ([]web.RemoteVersion, error
 // Install installs a JDK version
 func (vm *VersionManager) Install(version string) error {
 	// Resolve version
+	fmt.Println("Resolving version...")
 	resolvedVersion, err := vm.Client.ResolveVersion(version)
 	if err != nil {
 		return fmt.Errorf("failed to resolve version: %w", err)
@@ -145,8 +148,6 @@ func (vm *VersionManager) Install(version string) error {
 	}
 
 	// Download
-	fmt.Printf("Downloading JDK %s (%s)...\n", resolvedVersion, formatSize(fileSize))
-
 	tmpFile, err := vm.downloadFile(downloadURL, fileSize)
 	if err != nil {
 		return fmt.Errorf("failed to download: %w", err)
@@ -155,14 +156,45 @@ func (vm *VersionManager) Install(version string) error {
 
 	// Extract
 	installPath := filepath.Join(vm.Config.JDKHome, fmt.Sprintf("jdk-%s", resolvedVersion))
-	fmt.Printf("Extracting to %s...\n", installPath)
-
-	if err := file.Extract(tmpFile, installPath); err != nil {
+	if err := vm.extractWithProgress(tmpFile, installPath); err != nil {
 		return fmt.Errorf("failed to extract: %w", err)
 	}
 
 	fmt.Printf("JDK %s installed successfully!\n", resolvedVersion)
 	return nil
+}
+
+// extractWithProgress extracts an archive with a progress bar.
+func (vm *VersionManager) extractWithProgress(archive, dest string) error {
+	// Count total files first
+	totalFiles, err := countArchiveFiles(archive)
+	if err != nil {
+		return err
+	}
+
+	bar := progress.NewFiles("Extracting", int64(totalFiles))
+	defer bar.Done()
+
+	return file.ExtractWithProgress(archive, dest, func(current, total int64) {
+		bar.Update(current)
+	})
+}
+
+// countArchiveFiles counts the number of files in a zip archive.
+func countArchiveFiles(archive string) (int, error) {
+	r, err := zip.OpenReader(archive)
+	if err != nil {
+		return 0, err
+	}
+	defer r.Close()
+
+	count := 0
+	for _, f := range r.File {
+		if !f.FileInfo().IsDir() {
+			count++
+		}
+	}
+	return count, nil
 }
 
 // Uninstall uninstalls a JDK version
@@ -345,24 +377,37 @@ func (vm *VersionManager) downloadFile(url string, expectedSize int64) (string, 
 	}
 	defer tmpFile.Close()
 
-	if _, err := io.Copy(tmpFile, resp.Body); err != nil {
+	// Create progress bar
+	bar := progress.New("Downloading", expectedSize)
+	defer bar.Done()
+
+	// Wrap response body with progress tracking
+	reader := &progressReader{
+		reader: resp.Body,
+		bar:    bar,
+	}
+
+	if _, err := io.Copy(tmpFile, reader); err != nil {
 		return "", err
 	}
 
 	return tmpFile.Name(), nil
 }
 
-func formatSize(bytes int64) string {
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%d B", bytes)
+// progressReader wraps an io.Reader and updates a progress bar on each Read.
+type progressReader struct {
+	reader io.Reader
+	bar    *progress.ProgressBar
+	total  int64
+}
+
+func (pr *progressReader) Read(p []byte) (n int, err error) {
+	n, err = pr.reader.Read(p)
+	if n > 0 {
+		pr.total += int64(n)
+		pr.bar.Update(pr.total)
 	}
-	div, exp := int64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+	return
 }
 
 // Init initializes the version manager (creates directories)

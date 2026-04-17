@@ -105,6 +105,12 @@ func CopyFile(src, dst string) error {
 
 // Extract extracts an archive (zip or tar.gz) to the destination directory
 func Extract(archive, dest string) error {
+	return ExtractWithProgress(archive, dest, nil)
+}
+
+// ExtractWithProgress extracts an archive with progress callback.
+// The progress callback receives (current, total) file counts.
+func ExtractWithProgress(archive, dest string, progress func(current, total int64)) error {
 	// Ensure destination exists
 	if err := os.MkdirAll(dest, 0755); err != nil {
 		return err
@@ -113,22 +119,31 @@ func Extract(archive, dest string) error {
 	// Determine archive type
 	lower := strings.ToLower(archive)
 	if strings.HasSuffix(lower, ".zip") {
-		return extractZip(archive, dest)
+		return extractZipWithProgress(archive, dest, progress)
 	}
 	if strings.HasSuffix(lower, ".tar.gz") || strings.HasSuffix(lower, ".tgz") {
-		return extractTarGz(archive, dest)
+		return extractTarGzWithProgress(archive, dest, progress)
 	}
 
 	return fmt.Errorf("unsupported archive format: %s", archive)
 }
 
-func extractZip(archive, dest string) error {
+func extractZipWithProgress(archive, dest string, progress func(current, total int64)) error {
 	r, err := zip.OpenReader(archive)
 	if err != nil {
 		return err
 	}
 	defer r.Close()
 
+	// Count total files for progress tracking
+	totalFiles := int64(0)
+	for _, f := range r.File {
+		if !f.FileInfo().IsDir() {
+			totalFiles++
+		}
+	}
+
+	var extracted int64
 	for _, f := range r.File {
 		path := filepath.Join(dest, f.Name)
 
@@ -152,23 +167,30 @@ func extractZip(archive, dest string) error {
 		if err != nil {
 			return err
 		}
-		defer outFile.Close()
 
 		inFile, err := f.Open()
 		if err != nil {
+			outFile.Close()
 			return err
 		}
-		defer inFile.Close()
 
-		if _, err := io.Copy(outFile, inFile); err != nil {
-			return err
+		_, copyErr := io.Copy(outFile, inFile)
+		outFile.Close()
+		inFile.Close()
+		if copyErr != nil {
+			return copyErr
+		}
+
+		extracted++
+		if progress != nil {
+			progress(extracted, totalFiles)
 		}
 	}
 
 	return nil
 }
 
-func extractTarGz(archive, dest string) error {
+func extractTarGzWithProgress(archive, dest string, progress func(current, total int64)) error {
 	file, err := os.Open(archive)
 	if err != nil {
 		return err
@@ -177,6 +199,35 @@ func extractTarGz(archive, dest string) error {
 
 	tr := tar.NewReader(file)
 
+	// First pass: count total files
+	totalFiles := int64(0)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if header.Typeflag == tar.TypeReg {
+			totalFiles++
+		}
+	}
+
+	// Reset reader for second pass
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	// Re-open to reset tar reader
+	file.Close()
+	file, err = os.Open(archive)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	tr = tar.NewReader(file)
+
+	var extracted int64
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {
@@ -206,10 +257,16 @@ func extractTarGz(archive, dest string) error {
 			if err != nil {
 				return err
 			}
-			defer outFile.Close()
 
-			if _, err := io.Copy(outFile, tr); err != nil {
-				return err
+			_, copyErr := io.Copy(outFile, tr)
+			outFile.Close()
+			if copyErr != nil {
+				return copyErr
+			}
+
+			extracted++
+			if progress != nil {
+				progress(extracted, totalFiles)
 			}
 		}
 	}

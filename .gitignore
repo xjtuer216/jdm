@@ -21,3 +21,7 @@
 .sisyphus
 docs/
 CLAUDE.md
+
+# Installer build outputs
+installer/dist/
+installer/assets/jdm.exe

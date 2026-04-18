@@ -7,6 +7,13 @@
   <img src="https://img.shields.io/badge/license-MIT-orange" alt="License">
 </p>
 
+<p align="center">
+  <a href="https://gitee.com/xjtuer216/jdm">Gitee</a> · 
+  <a href="https://github.com/xjtuer216/jdm">GitHub</a> · 
+  <a href="https://github.com/xjtuer216/jdm/releases">Releases</a> · 
+  <a href="https://github.com/xjtuer216/jdm/blob/develop/CHANGELOG.md">CHANGELOG</a>
+</p>
+
 JDM (JDK Version Manager) is a JDK version management tool for Windows, similar to nvm for Node.js. It helps you easily install, manage, and switch between multiple JDK versions on Windows.
 
 ## Features
@@ -25,14 +32,14 @@ JDM (JDK Version Manager) is a JDK version management tool for Windows, similar 
 
 ### Method 1: Using the Installer (Recommended)
 
-1. Download `jdm-setup-*.exe` from [Releases](https://github.com/xjtuer216/jdm/releases)
+1. Download `jdm-setup-*.exe` from [Gitee Releases](https://gitee.com/xjtuer216/jdm/releases) or [GitHub Releases](https://github.com/xjtuer216/jdm/releases)
 2. Double-click to run the installer
 3. Choose the installation directory and JDK storage location
 4. Open a new terminal after installation to start using JDM
 
 ### Method 2: Manual Installation
 
-1. Download the latest `jdm.exe` from [Releases](https://github.com/xjtuer216/jdm/releases)
+1. Download the latest `jdm.exe` from [Gitee Releases](https://gitee.com/xjtuer216/jdm/releases) or [GitHub Releases](https://github.com/xjtuer216/jdm/releases)
 2. Place `jdm.exe` in your preferred directory
 3. Add that directory to your system PATH environment variable
 

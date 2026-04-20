@@ -9,9 +9,9 @@ import (
 const (
 	// DefaultMirror 是默认的 Adoptium 镜像地址
 	DefaultMirror = "https://api.adoptium.net"
-	// DefaultDownloadMirror 是默认的 JDK 下载镜像/代理地址
+	// DefaultProxy 是默认的 JDK 下载代理地址
 	// 使用 ghproxy.net 代理 GitHub Releases 下载
-	DefaultDownloadMirror = "https://ghproxy.net"
+	DefaultProxy = "https://ghproxy.net"
 	// ConfigFileName 是配置文件名
 	ConfigFileName = "config.json"
 )
@@ -20,7 +20,7 @@ type Config struct {
 	JDMHome        string            `json:"jdm_home"`
 	JDKHome        string            `json:"jdk_home"`
 	Mirror         string            `json:"mirror"`
-	DownloadMirror string            `json:"download_mirror"`
+	Proxy          string            `json:"proxy"`
 	Default        string            `json:"default"`
 	Aliases        map[string]string `json:"aliases"`
 }
@@ -51,6 +51,7 @@ func NewConfig(jdmHome string) *Config {
 		JDMHome: jdmHome,
 		JDKHome: jdkHome,
 		Mirror:  DefaultMirror,
+		Proxy:   DefaultProxy,
 		Default: "",
 		Aliases: make(map[string]string),
 	}
@@ -85,6 +86,9 @@ func (c *Config) Load() error {
 				// 使用安装配置中的值（如果存在）
 				if installConfig.Mirror != "" && installConfig.Mirror != DefaultMirror {
 					c.Mirror = installConfig.Mirror
+				}
+				if installConfig.Proxy != "" {
+					c.Proxy = installConfig.Proxy
 				}
 				if installConfig.JDMHome != "" {
 					c.JDMHome = installConfig.JDMHome
@@ -126,6 +130,7 @@ func (c *Config) SaveToInstallDir() error {
 		"jdm_home": c.JDMHome,
 		"jdk_home": c.JDKHome,
 		"mirror":   c.Mirror,
+		"proxy":    c.Proxy,
 	}
 
 	data, err := json.MarshalIndent(installConfig, "", "  ")
@@ -155,6 +160,8 @@ func (c *Config) Get(key string) string {
 		return c.JDKHome
 	case "mirror":
 		return c.Mirror
+	case "proxy":
+		return c.Proxy
 	case "default":
 		return c.Default
 	default:
@@ -171,6 +178,8 @@ func (c *Config) Set(key, value string) error {
 		c.JDKHome = value
 	case "mirror":
 		c.Mirror = value
+	case "proxy":
+		c.Proxy = value
 	case "default":
 		c.Default = value
 	default:
@@ -210,6 +219,7 @@ func (c *Config) GetAll() map[string]string {
 		"jdm_home": c.JDMHome,
 		"jdk_home": c.JDKHome,
 		"mirror":   c.Mirror,
+		"proxy":    c.Proxy,
 		"default":  c.Default,
 	}
 }

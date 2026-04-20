@@ -344,16 +344,19 @@ begin
     if JDKHomePath[Length(JDKHomePath)] = '\' then
       JDKHomePath := Copy(JDKHomePath, 1, Length(JDKHomePath) - 1);
   end;
+  ConfigPath := JDMHomePath + '\config.json';
+  ForceDirectories(JDMHomePath);
+  { Escape backslashes for valid JSON }
+  StringChangeEx(JDMHomePath, '\', '\\', True);
+  StringChangeEx(JDKHomePath, '\', '\\', True);
   ConfigContent := '{' + #13#10;
   ConfigContent := ConfigContent + '  "jdm_home": "' + JDMHomePath + '",' + #13#10;
   ConfigContent := ConfigContent + '  "jdk_home": "' + JDKHomePath + '",' + #13#10;
   ConfigContent := ConfigContent + '  "mirror": "https://api.adoptium.net",' + #13#10;
-  ConfigContent := ConfigContent + '  "download_mirror": "https://ghproxy.net",' + #13#10;
+  ConfigContent := ConfigContent + '  "proxy": "https://ghproxy.net",' + #13#10;
   ConfigContent := ConfigContent + '  "default": "",' + #13#10;
   ConfigContent := ConfigContent + '  "aliases": {}' + #13#10;
   ConfigContent := ConfigContent + '}' + #13#10;
-  ConfigPath := JDMHomePath + '\config.json';
-  ForceDirectories(JDMHomePath);
   SaveStringToFile(ConfigPath, ConfigContent, False);
   Log('[JDM] Generated config at: ' + ConfigPath);
 end;

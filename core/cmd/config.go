@@ -101,9 +101,9 @@ func init() {
 
 	// 注册配置项补全
 	_ = configGetCmd.RegisterFlagCompletionFunc("key", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"jdm_home", "jdk_home", "mirror", "default"}, cobra.ShellCompDirectiveNoFileComp
+		return []string{"jdm_home", "jdk_home", "mirror", "proxy", "default"}, cobra.ShellCompDirectiveNoFileComp
 	})
 	_ = configSetCmd.RegisterFlagCompletionFunc("key", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"jdm_home", "jdk_home", "mirror", "default"}, cobra.ShellCompDirectiveNoFileComp
+		return []string{"jdm_home", "jdk_home", "mirror", "proxy", "default"}, cobra.ShellCompDirectiveNoFileComp
 	})
 }

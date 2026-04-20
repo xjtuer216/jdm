@@ -2,7 +2,7 @@
   "jdm_home": "",
   "jdk_home": "",
   "mirror": "https://api.adoptium.net",
-  "download_mirror": "https://ghproxy.net",
+  "proxy": "https://ghproxy.net",
   "default": "",
   "aliases": {}
 }

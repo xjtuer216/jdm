@@ -349,11 +349,11 @@ func (vm *VersionManager) parseMajorVersion(version string) int {
 }
 
 func (vm *VersionManager) downloadFile(url string, expectedSize int64) (string, error) {
-	// Use download mirror if configured
-	// Mirror format: prefix the original URL, e.g. "https://ghproxy.net/https://github.com/..."
+	// Use proxy if configured
+	// Proxy format: prefix the original URL, e.g. "https://ghproxy.net/https://github.com/..."
 	downloadURL := url
-	if vm.Config.DownloadMirror != "" && strings.Contains(url, "github.com") {
-		downloadURL = vm.Config.DownloadMirror + "/" + url
+	if vm.Config.Proxy != "" && strings.Contains(url, "github.com") {
+		downloadURL = vm.Config.Proxy + "/" + url
 	}
 
 	// Use a separate client with longer timeout for large file downloads

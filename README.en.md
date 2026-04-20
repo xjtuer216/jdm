@@ -123,7 +123,7 @@ jdm config init
 | `jdm_home` | JDM main directory | `~/.jdm` |
 | `jdk_home` | JDK installation directory | `~/.jdm/versions` |
 | `mirror` | Adoptium API mirror | `https://api.adoptium.net/v3` |
-| `download_mirror` | GitHub download proxy | `https://ghproxy.net` |
+| ~~`download_mirror`~~ → `proxy` | GitHub download proxy (`download_mirror` renamed to `proxy`) | `https://ghproxy.net` |
 | `default` | Default JDK version | (not set) |
 | `aliases` | Version aliases | `{}` |
 
@@ -194,7 +194,7 @@ A: JDM has a built-in fallback mechanism. When symlink creation fails, it automa
 
 A: Check your network connection and ensure the mirror source is accessible. Users in China can configure a download proxy:
 ```powershell
-jdm config set download_mirror https://ghproxy.net
+jdm config set proxy https://ghproxy.net
 ```
 
 ### Q: Version switch doesn't take effect

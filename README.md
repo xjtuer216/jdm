@@ -123,7 +123,7 @@ jdm config init
 | `jdm_home` | JDM 主目录 | `~/.jdm` |
 | `jdk_home` | JDK 安装目录 | `~/.jdm/versions` |
 | `mirror` | Adoptium API 镜像 | `https://api.adoptium.net/v3` |
-| `proxy` | GitHub 下载代理 | `https://ghproxy.net` |
+| ~~`download_mirror`~~ `proxy` | GitHub 下载代理（v0.1.1 起 `download_mirror` 重命名为 `proxy`） | `https://ghproxy.net` |
 | `default` | 默认 JDK 版本 | (未设置) |
 | `aliases` | 版本别名 | `{}` |
 

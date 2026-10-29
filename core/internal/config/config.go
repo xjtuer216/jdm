@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const (
@@ -15,7 +16,26 @@ const (
 	DefaultProxy = "https://ghproxy.net"
 	// ConfigFileName 是配置文件名
 	ConfigFileName = "config.json"
+	// LegacyProxyKey 是 proxy 的旧名称（v0.1.1 前），仍作为别名接受
+	LegacyProxyKey = "download_mirror"
 )
+
+// supportedKeys 是 config get/set 支持的配置项
+var supportedKeys = []string{"jdm_home", "jdk_home", "mirror", "proxy", "default"}
+
+// SupportedKeys 返回 config get/set 支持的配置项名称
+func SupportedKeys() []string {
+	return append([]string(nil), supportedKeys...)
+}
+
+// CanonicalKey 把旧配置项名称映射为当前名称，其他名称原样返回
+// 与 encoding/json 一致，名称匹配不区分大小写
+func CanonicalKey(key string) string {
+	if strings.EqualFold(key, LegacyProxyKey) {
+		return "proxy"
+	}
+	return key
+}
 
 type Config struct {
 	JDMHome        string            `json:"jdm_home"`
@@ -105,7 +125,7 @@ func (c *Config) Load() error {
 	data, err := os.ReadFile(configPath)
 	if err == nil {
 		// 用户配置存在，解析并返回
-		if err := json.Unmarshal(data, c); err != nil {
+		if err := c.unmarshalConfig(data); err != nil {
 			return &ConfigError{Source: SourceUser, Path: configPath, Err: err}
 		}
 		return c.ensureDirectories()
@@ -119,7 +139,7 @@ func (c *Config) Load() error {
 		if err == nil {
 			// 安装配置存在，解析并合并到当前配置
 			var installConfig Config
-			if err := json.Unmarshal(data, &installConfig); err != nil {
+			if err := installConfig.unmarshalConfig(data); err != nil {
 				// 安装配置损坏时必须报错，否则会静默退回默认配置
 				loadErr = &ConfigError{Source: SourceInstall, Path: installConfigPath, Err: err}
 			} else {
@@ -145,6 +165,38 @@ func (c *Config) Load() error {
 		return err
 	}
 	return loadErr
+}
+
+// unmarshalConfig 解析配置内容，并把旧版配置项名称规范化为当前名称
+// 同时存在旧名称与当前名称时以当前名称为准
+func (c *Config) unmarshalConfig(data []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+
+	// 旧名称统一交给 CanonicalKey 映射，避免别名规则出现两份
+	var legacyRaw json.RawMessage
+	hasProxy := false
+	for key, raw := range fields {
+		if canonical := CanonicalKey(key); canonical != key {
+			legacyRaw = raw
+			delete(fields, key)
+			continue
+		}
+		if strings.EqualFold(key, "proxy") {
+			hasProxy = true
+		}
+	}
+	if legacyRaw != nil && !hasProxy {
+		fields["proxy"] = legacyRaw
+	}
+
+	normalized, err := json.Marshal(fields)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(normalized, c)
 }
 
 // Save 保存配置到用户目录
@@ -196,7 +248,7 @@ func (c *Config) ensureDirectories() error {
 
 // Get 获取配置项的值
 func (c *Config) Get(key string) string {
-	switch key {
+	switch CanonicalKey(key) {
 	case "jdm_home":
 		return c.JDMHome
 	case "jdk_home":
@@ -214,7 +266,7 @@ func (c *Config) Get(key string) string {
 
 // Set 设置配置项的值
 func (c *Config) Set(key, value string) error {
-	switch key {
+	switch CanonicalKey(key) {
 	case "jdm_home":
 		c.JDMHome = value
 	case "jdk_home":
@@ -226,7 +278,7 @@ func (c *Config) Set(key, value string) error {
 	case "default":
 		c.Default = value
 	default:
-		return nil
+		return fmt.Errorf("unknown config key %q (supported: %s)", key, strings.Join(supportedKeys, ", "))
 	}
 	return c.Save()
 }

@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/xjtuer216/jdm/internal/config"
 )
 
 var configCmd = &cobra.Command{
@@ -26,7 +27,7 @@ var configGetCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := getConfig()
-		key := args[0]
+		key := canonicalKey(args[0])
 		value := cfg.Get(key)
 		if value == "" {
 			fmt.Printf("Key '%s' not found\n", key)
@@ -42,7 +43,7 @@ var configSetCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := getConfig()
-		key := args[0]
+		key := canonicalKey(args[0])
 		value := args[1]
 
 		if err := cfg.Set(key, value); err != nil {
@@ -52,6 +53,15 @@ var configSetCmd = &cobra.Command{
 
 		fmt.Printf("%s set to '%s'\n", key, value)
 	},
+}
+
+// canonicalKey 返回配置项的规范名称，使用旧名称时输出弃用提示
+func canonicalKey(key string) string {
+	canonical := config.CanonicalKey(key)
+	if canonical != key {
+		fmt.Fprintf(os.Stderr, "Warning: '%s' is deprecated, use '%s' instead\n", key, canonical)
+	}
+	return canonical
 }
 
 var configListCmd = &cobra.Command{
@@ -101,9 +111,9 @@ func init() {
 
 	// 注册配置项补全
 	_ = configGetCmd.RegisterFlagCompletionFunc("key", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"jdm_home", "jdk_home", "mirror", "proxy", "default"}, cobra.ShellCompDirectiveNoFileComp
+		return config.SupportedKeys(), cobra.ShellCompDirectiveNoFileComp
 	})
 	_ = configSetCmd.RegisterFlagCompletionFunc("key", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"jdm_home", "jdk_home", "mirror", "proxy", "default"}, cobra.ShellCompDirectiveNoFileComp
+		return config.SupportedKeys(), cobra.ShellCompDirectiveNoFileComp
 	})
 }

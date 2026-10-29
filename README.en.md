@@ -123,7 +123,7 @@ jdm config init
 | `jdm_home` | JDM main directory | `~/.jdm` |
 | `jdk_home` | JDK installation directory | `~/.jdm/versions` |
 | `mirror` | Adoptium API mirror | `https://api.adoptium.net/v3` |
-| ~~`download_mirror`~~ → `proxy` | GitHub download proxy (`download_mirror` renamed to `proxy`) | `https://ghproxy.net` |
+| ~~`download_mirror`~~ → `proxy` | GitHub download proxy (`download_mirror` is deprecated but still accepted as an alias) | `https://ghproxy.net` |
 | `default` | Default JDK version | (not set) |
 | `aliases` | Version aliases | `{}` |
 

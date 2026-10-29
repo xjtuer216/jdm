@@ -34,7 +34,7 @@ core/
 ## CONVENTIONS
 - **Package naming**: Single word, lowercase (`config`, `jdk`, `web`)
 - **Error handling**: Return errors, don't panic
-- **Tests**: `*_test.go` alongside source, use `testify`
+- **Tests**: `*_test.go` alongside source, standard library `testing` (testify is not a dependency)
 - **Version injection**: `-ldflags "-X github.com/xjtuer216/jdm/internal/jdk.Version=X.Y.Z"`
 
 ## ANTI-PATTERNS

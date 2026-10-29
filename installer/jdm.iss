@@ -330,10 +330,44 @@ end;
 { Configuration File Generation                                                }
 { ============================================================================ }
 
+{ JsonEscape 将文本转义为合法的 JSON 字符串内容（不含外围双引号） }
+{ Windows 路径中的反斜杠必须转义，否则 JDM 无法解析生成的配置文件 }
+function JsonEscape(const S: string): string;
+var
+  I: Integer;
+  C: Char;
+  Code: Integer;
+  HexDigits: string;
+begin
+  HexDigits := '0123456789abcdef';
+  Result := '';
+  for I := 1 to Length(S) do
+  begin
+    C := S[I];
+    if C = '\' then
+      Result := Result + '\\'
+    else if C = '"' then
+      Result := Result + '\"'
+    else if C = #13 then
+      Result := Result + '\r'
+    else if C = #10 then
+      Result := Result + '\n'
+    else if C = #9 then
+      Result := Result + '\t'
+    else if Ord(C) < 32 then
+    begin
+      Code := Ord(C);
+      Result := Result + '\u00' + HexDigits[(Code div 16) + 1] + HexDigits[(Code mod 16) + 1];
+    end
+    else
+      Result := Result + C;
+  end;
+end;
+
 procedure GenerateConfig;
 var
   ConfigPath: string;
-  ConfigContent: string;
+  ConfigLines: TArrayOfString;
   JDMHomePath: string;
   JDKHomePath: string;
 begin
@@ -346,18 +380,22 @@ begin
   end;
   ConfigPath := JDMHomePath + '\config.json';
   ForceDirectories(JDMHomePath);
-  { Escape backslashes for valid JSON }
-  StringChangeEx(JDMHomePath, '\', '\\', True);
-  StringChangeEx(JDKHomePath, '\', '\\', True);
-  ConfigContent := '{' + #13#10;
-  ConfigContent := ConfigContent + '  "jdm_home": "' + JDMHomePath + '",' + #13#10;
-  ConfigContent := ConfigContent + '  "jdk_home": "' + JDKHomePath + '",' + #13#10;
-  ConfigContent := ConfigContent + '  "mirror": "https://api.adoptium.net",' + #13#10;
-  ConfigContent := ConfigContent + '  "proxy": "https://ghproxy.net",' + #13#10;
-  ConfigContent := ConfigContent + '  "default": "",' + #13#10;
-  ConfigContent := ConfigContent + '  "aliases": {}' + #13#10;
-  ConfigContent := ConfigContent + '}' + #13#10;
-  SaveStringToFile(ConfigPath, ConfigContent, False);
+  SetArrayLength(ConfigLines, 8);
+  ConfigLines[0] := '{';
+  ConfigLines[1] := '  "jdm_home": "' + JsonEscape(JDMHomePath) + '",';
+  ConfigLines[2] := '  "jdk_home": "' + JsonEscape(JDKHomePath) + '",';
+  ConfigLines[3] := '  "mirror": "https://api.adoptium.net",';
+  ConfigLines[4] := '  "proxy": "https://ghproxy.net",';
+  ConfigLines[5] := '  "default": "",';
+  ConfigLines[6] := '  "aliases": {}';
+  ConfigLines[7] := '}';
+  { 以 UTF-8 无 BOM 写出：SaveStringToFile 按系统 ANSI 代码页写入，
+    中文路径会被写成 GBK 字节，JDM 同样无法解析 }
+  if not SaveStringsToUTF8FileWithoutBOM(ConfigPath, ConfigLines, False) then
+  begin
+    Log('[JDM] Failed to write config: ' + ConfigPath);
+    Exit;
+  end;
   Log('[JDM] Generated config at: ' + ConfigPath);
 end;
 

@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- 解压 JDK 归档时剥离自带的单一根目录，避免安装后多出一层版本目录
+- 修复 `.tar.gz` 归档未被 gzip 解压的问题
+
 ---
 
 ## [0.1.0] - 2026-04-18

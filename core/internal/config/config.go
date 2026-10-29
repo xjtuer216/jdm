@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -23,6 +24,41 @@ type Config struct {
 	Proxy          string            `json:"proxy"`
 	Default        string            `json:"default"`
 	Aliases        map[string]string `json:"aliases"`
+}
+
+// 配置来源标识
+const (
+	// SourceUser 表示用户配置文件（~/.jdm/config.json）
+	SourceUser = "user"
+	// SourceInstall 表示安装目录配置文件（exe 同目录/config.json）
+	SourceInstall = "install"
+)
+
+// ConfigError 表示配置文件解析失败
+// 携带出错文件的来源与路径，便于用户定位并修复
+type ConfigError struct {
+	// Source 是配置来源：SourceUser 或 SourceInstall
+	Source string
+	// Path 是解析失败的配置文件路径
+	Path string
+	// Err 是底层的解析错误
+	Err error
+}
+
+func (e *ConfigError) Error() string {
+	return fmt.Sprintf("failed to parse %s config %s: %v", e.Source, e.Path, e.Err)
+}
+
+func (e *ConfigError) Unwrap() error {
+	return e.Err
+}
+
+// Hint 返回针对该来源的修复建议
+func (e *ConfigError) Hint() string {
+	if e.Source == SourceInstall {
+		return fmt.Sprintf("the install config is only a template; fix or delete %s, then run \"jdm config init\" to generate your user config", e.Path)
+	}
+	return fmt.Sprintf("fix or delete %s, then run \"jdm config init\" to regenerate it", e.Path)
 }
 
 // GetConfigPath 获取用户配置文件的路径
@@ -70,19 +106,23 @@ func (c *Config) Load() error {
 	if err == nil {
 		// 用户配置存在，解析并返回
 		if err := json.Unmarshal(data, c); err != nil {
-			return err
+			return &ConfigError{Source: SourceUser, Path: configPath, Err: err}
 		}
 		return c.ensureDirectories()
 	}
 
 	// 用户配置不存在，尝试加载安装目录配置
+	var loadErr error
 	installConfigPath := c.GetInstallConfigPath()
 	if installConfigPath != "" {
 		data, err := os.ReadFile(installConfigPath)
 		if err == nil {
 			// 安装配置存在，解析并合并到当前配置
 			var installConfig Config
-			if err := json.Unmarshal(data, &installConfig); err == nil {
+			if err := json.Unmarshal(data, &installConfig); err != nil {
+				// 安装配置损坏时必须报错，否则会静默退回默认配置
+				loadErr = &ConfigError{Source: SourceInstall, Path: installConfigPath, Err: err}
+			} else {
 				// 使用安装配置中的值（如果存在）
 				if installConfig.Mirror != "" && installConfig.Mirror != DefaultMirror {
 					c.Mirror = installConfig.Mirror
@@ -101,7 +141,10 @@ func (c *Config) Load() error {
 	}
 
 	// 确保目录存在
-	return c.ensureDirectories()
+	if err := c.ensureDirectories(); err != nil {
+		return err
+	}
+	return loadErr
 }
 
 // Save 保存配置到用户目录

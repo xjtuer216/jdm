@@ -34,7 +34,7 @@ JDM (JDK Version Manager) 是一个 Windows 平台下的 JDK 版本管理工具�
 
 1. 从 [Gitee Releases](https://gitee.com/xjtuer216/jdm/releases) 或 [GitHub Releases](https://github.com/xjtuer216/jdm/releases) 下载 `jdm-setup-*.exe`
 2. 双击运行安装程序
-3. 选择安装目录和 JDK 存储位置
+3. 选择安装目录（JDK 版本固定存放在其下的 `versions` 子目录）
 4. 安装完成后打开新终端即可使用
 
 ### 方式二：手动安装

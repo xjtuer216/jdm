@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- 安装程序不再单独选择 JDK 存储位置，`jdk_home` 固定为安装目录下的 `versions`，修复 `jdm ls` 把目录名当作版本号 (IKE2IU)
+- 安装程序把 `<JDM_HOME>\current\bin` 写入 PATH，此前误写为 `versions\current\bin`
+- 卸载时从 `JDM_HOME` 读取实际安装路径，并删除残留的 `current` 链接与 PATH 项 (IKE2IP)
+- 升级安装后 JDK 版本目录统一为 `<安装目录>\versions`，旧版默认目录 `%APPDATA%\JDM\versions` 中的版本不再被识别
 - 解压 JDK 归档时剥离自带的单一根目录，避免安装后多出一层版本目录
 - 修复 `.tar.gz` 归档未被 gzip 解压的问题
 

@@ -34,7 +34,7 @@ JDM (JDK Version Manager) is a JDK version management tool for Windows, similar 
 
 1. Download `jdm-setup-*.exe` from [Gitee Releases](https://gitee.com/xjtuer216/jdm/releases) or [GitHub Releases](https://github.com/xjtuer216/jdm/releases)
 2. Double-click to run the installer
-3. Choose the installation directory and JDK storage location
+3. Choose the installation directory (JDK versions are stored in its `versions` subdirectory)
 4. Open a new terminal after installation to start using JDM
 
 ### Method 2: Manual Installation

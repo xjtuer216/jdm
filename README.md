@@ -125,7 +125,7 @@ jdm config init
 | `mirror` | Adoptium API 镜像 | `https://api.adoptium.net/v3` |
 | ~~`download_mirror`~~ `proxy` | GitHub 下载代理（`download_mirror` 已弃用，仍作为别名接受并提示） | `https://ghproxy.net` |
 | `default` | 默认 JDK 版本 | (未设置) |
-| `aliases` | 版本别名 | `{}` |
+| `aliases` | 版本别名（只读，使用 `jdm alias` 管理） | `{}` |
 
 ### 自定义镜像源
 

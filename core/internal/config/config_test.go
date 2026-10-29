@@ -122,6 +122,49 @@ func TestConfig_SetUnknownKey(t *testing.T) {
 	}
 }
 
+func TestConfig_GetAliases(t *testing.T) {
+	cfg := NewConfig(t.TempDir())
+
+	if got := cfg.Get("aliases"); got != "{}" {
+		t.Errorf("expected empty aliases as %q, got %q", "{}", got)
+	}
+
+	cfg.SetAlias("myjdk", "17.0.2+2")
+	cfg.SetAlias("lts", "21")
+
+	const want = `{"lts":"21","myjdk":"17.0.2+2"}`
+	if got := cfg.Get("aliases"); got != want {
+		t.Errorf("expected aliases %s, got %s", want, got)
+	}
+}
+
+func TestConfig_GetAllIncludesAliases(t *testing.T) {
+	cfg := NewConfig(t.TempDir())
+	cfg.SetAlias("myjdk", "17.0.2+2")
+
+	const want = `{"myjdk":"17.0.2+2"}`
+	if got := cfg.GetAll()["aliases"]; got != want {
+		t.Errorf("expected aliases in config list %s, got %s", want, got)
+	}
+}
+
+func TestConfig_SetAliasesRejected(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := NewConfig(tmpDir)
+
+	err := cfg.Set("aliases", `{"myjdk":"17.0.2+2"}`)
+	if err == nil {
+		t.Fatal("expected setting aliases via config set to fail")
+	}
+	if !strings.Contains(err.Error(), "jdm alias") {
+		t.Errorf("expected error to point at jdm alias, got %v", err)
+	}
+
+	if _, statErr := os.Stat(filepath.Join(tmpDir, "config.json")); !os.IsNotExist(statErr) {
+		t.Errorf("rejected aliases set must not write a config file, stat error: %v", statErr)
+	}
+}
+
 func TestConfig_LoadLegacyDownloadMirror(t *testing.T) {
 	tests := []struct {
 		name   string

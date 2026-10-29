@@ -125,7 +125,7 @@ jdm config init
 | `mirror` | Adoptium API mirror | `https://api.adoptium.net/v3` |
 | ~~`download_mirror`~~ → `proxy` | GitHub download proxy (`download_mirror` is deprecated but still accepted as an alias) | `https://ghproxy.net` |
 | `default` | Default JDK version | (not set) |
-| `aliases` | Version aliases | `{}` |
+| `aliases` | Version aliases (read-only; manage with `jdm alias`) | `{}` |
 
 ### Custom Mirror Sources
 

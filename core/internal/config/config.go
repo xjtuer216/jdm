@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -20,8 +21,8 @@ const (
 	LegacyProxyKey = "download_mirror"
 )
 
-// supportedKeys 是 config get/set 支持的配置项
-var supportedKeys = []string{"jdm_home", "jdk_home", "mirror", "proxy", "default"}
+// supportedKeys 是 config get/set 可识别的配置项
+var supportedKeys = []string{"jdm_home", "jdk_home", "mirror", "proxy", "default", "aliases"}
 
 // SupportedKeys 返回 config get/set 支持的配置项名称
 func SupportedKeys() []string {
@@ -259,6 +260,8 @@ func (c *Config) Get(key string) string {
 		return c.Proxy
 	case "default":
 		return c.Default
+	case "aliases":
+		return formatAliases(c.Aliases)
 	default:
 		return ""
 	}
@@ -277,10 +280,21 @@ func (c *Config) Set(key, value string) error {
 		c.Proxy = value
 	case "default":
 		c.Default = value
+	case "aliases":
+		return errors.New(`aliases is a map; use "jdm alias set <name> <version>" or "jdm alias del <name>"`)
 	default:
 		return fmt.Errorf("unknown config key %q (supported: %s)", key, strings.Join(supportedKeys, ", "))
 	}
 	return c.Save()
+}
+
+// formatAliases 把别名映射序列化为 JSON，供 config get/list 展示
+func formatAliases(aliases map[string]string) string {
+	data, err := json.Marshal(aliases)
+	if err != nil || string(data) == "null" {
+		return "{}"
+	}
+	return string(data)
 }
 
 // SetAlias 设置版本别名
@@ -316,5 +330,6 @@ func (c *Config) GetAll() map[string]string {
 		"mirror":   c.Mirror,
 		"proxy":    c.Proxy,
 		"default":  c.Default,
+		"aliases":  formatAliases(c.Aliases),
 	}
 }

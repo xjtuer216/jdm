@@ -19,21 +19,51 @@ const (
 	ConfigFileName = "config.json"
 	// LegacyProxyKey 是 proxy 的旧名称（v0.1.1 前），仍作为别名接受
 	LegacyProxyKey = "download_mirror"
+
+	jdmHomeKey = "jdm_home"
+	jdkHomeKey = "jdk_home"
+	mirrorKey  = "mirror"
+	proxyKey   = "proxy"
+	defaultKey = "default"
+	aliasesKey = "aliases"
 )
 
-// supportedKeys 是 config get/set 可识别的配置项
-var supportedKeys = []string{"jdm_home", "jdk_home", "mirror", "proxy", "default", "aliases"}
+// settableKeys 是可通过 config set 修改的标量配置项
+var settableKeys = []string{jdmHomeKey, jdkHomeKey, mirrorKey, proxyKey, defaultKey}
 
-// SupportedKeys 返回 config get/set 支持的配置项名称
-func SupportedKeys() []string {
-	return append([]string(nil), supportedKeys...)
+// readableKeys 是 config get/list 可读取的配置项，aliases 是其中唯一的映射项
+var readableKeys = append(append([]string{}, settableKeys...), aliasesKey)
+
+// SettableKeys 返回可通过 config set 修改的配置项名称
+func SettableKeys() []string {
+	return append([]string(nil), settableKeys...)
 }
 
-// CanonicalKey 把旧配置项名称映射为当前名称，其他名称原样返回
+// ReadableKeys 返回 config get/list 可读取的配置项名称
+func ReadableKeys() []string {
+	return append([]string(nil), readableKeys...)
+}
+
+// isLegacyProxyKey 判断配置项名称是否为 proxy 的旧名称
+func isLegacyProxyKey(key string) bool {
+	return strings.EqualFold(key, LegacyProxyKey)
+}
+
+// IsDeprecatedKey 判断配置项名称是否已弃用
+func IsDeprecatedKey(key string) bool {
+	return isLegacyProxyKey(key)
+}
+
+// CanonicalKey 返回配置项的规范名称：旧名称映射为当前名称，已知名称统一为规范拼写
 // 与 encoding/json 一致，名称匹配不区分大小写
 func CanonicalKey(key string) string {
-	if strings.EqualFold(key, LegacyProxyKey) {
-		return "proxy"
+	if isLegacyProxyKey(key) {
+		return proxyKey
+	}
+	for _, known := range readableKeys {
+		if strings.EqualFold(key, known) {
+			return known
+		}
 	}
 	return key
 }
@@ -176,28 +206,27 @@ func (c *Config) unmarshalConfig(data []byte) error {
 		return err
 	}
 
-	// 旧名称统一交给 CanonicalKey 映射，避免别名规则出现两份
+	// 已知名称统一为规范拼写；旧名称仅在缺少 proxy 时生效
+	normalized := make(map[string]json.RawMessage, len(fields))
 	var legacyRaw json.RawMessage
-	hasProxy := false
 	for key, raw := range fields {
-		if canonical := CanonicalKey(key); canonical != key {
+		if isLegacyProxyKey(key) {
 			legacyRaw = raw
-			delete(fields, key)
 			continue
 		}
-		if strings.EqualFold(key, "proxy") {
-			hasProxy = true
+		normalized[CanonicalKey(key)] = raw
+	}
+	if legacyRaw != nil {
+		if _, exists := normalized[proxyKey]; !exists {
+			normalized[proxyKey] = legacyRaw
 		}
 	}
-	if legacyRaw != nil && !hasProxy {
-		fields["proxy"] = legacyRaw
-	}
 
-	normalized, err := json.Marshal(fields)
+	normalizedData, err := json.Marshal(normalized)
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(normalized, c)
+	return json.Unmarshal(normalizedData, c)
 }
 
 // Save 保存配置到用户目录
@@ -247,54 +276,60 @@ func (c *Config) ensureDirectories() error {
 	return nil
 }
 
-// Get 获取配置项的值
-func (c *Config) Get(key string) string {
-	switch CanonicalKey(key) {
-	case "jdm_home":
-		return c.JDMHome
-	case "jdk_home":
-		return c.JDKHome
-	case "mirror":
-		return c.Mirror
-	case "proxy":
-		return c.Proxy
-	case "default":
-		return c.Default
-	case "aliases":
-		return formatAliases(c.Aliases)
+// scalarField 返回标量配置项对应的字段指针，非标量或未知配置项返回 nil
+func (c *Config) scalarField(canonicalKey string) *string {
+	switch canonicalKey {
+	case jdmHomeKey:
+		return &c.JDMHome
+	case jdkHomeKey:
+		return &c.JDKHome
+	case mirrorKey:
+		return &c.Mirror
+	case proxyKey:
+		return &c.Proxy
+	case defaultKey:
+		return &c.Default
 	default:
-		return ""
+		return nil
 	}
+}
+
+// Get 获取配置项的值
+func (c *Config) Get(key string) (string, error) {
+	canonical := CanonicalKey(key)
+	if canonical == aliasesKey {
+		return formatAliases(c.Aliases)
+	}
+	if field := c.scalarField(canonical); field != nil {
+		return *field, nil
+	}
+	return "", nil
 }
 
 // Set 设置配置项的值
 func (c *Config) Set(key, value string) error {
-	switch CanonicalKey(key) {
-	case "jdm_home":
-		c.JDMHome = value
-	case "jdk_home":
-		c.JDKHome = value
-	case "mirror":
-		c.Mirror = value
-	case "proxy":
-		c.Proxy = value
-	case "default":
-		c.Default = value
-	case "aliases":
+	canonical := CanonicalKey(key)
+	if canonical == aliasesKey {
 		return errors.New(`aliases is a map; use "jdm alias set <name> <version>" or "jdm alias del <name>"`)
-	default:
-		return fmt.Errorf("unknown config key %q (supported: %s)", key, strings.Join(supportedKeys, ", "))
 	}
+	field := c.scalarField(canonical)
+	if field == nil {
+		return fmt.Errorf("unknown config key %q (settable: %s)", key, strings.Join(settableKeys, ", "))
+	}
+	*field = value
 	return c.Save()
 }
 
 // formatAliases 把别名映射序列化为 JSON，供 config get/list 展示
-func formatAliases(aliases map[string]string) string {
+func formatAliases(aliases map[string]string) (string, error) {
 	data, err := json.Marshal(aliases)
-	if err != nil || string(data) == "null" {
-		return "{}"
+	if err != nil {
+		return "", err
 	}
-	return string(data)
+	if string(data) == "null" {
+		return "{}", nil
+	}
+	return string(data), nil
 }
 
 // SetAlias 设置版本别名
@@ -323,13 +358,14 @@ func (c *Config) ResolveVersion(version string) string {
 }
 
 // GetAll 获取所有配置项（用于显示）
-func (c *Config) GetAll() map[string]string {
-	return map[string]string{
-		"jdm_home": c.JDMHome,
-		"jdk_home": c.JDKHome,
-		"mirror":   c.Mirror,
-		"proxy":    c.Proxy,
-		"default":  c.Default,
-		"aliases":  formatAliases(c.Aliases),
+func (c *Config) GetAll() (map[string]string, error) {
+	all := make(map[string]string, len(readableKeys))
+	for _, key := range readableKeys {
+		value, err := c.Get(key)
+		if err != nil {
+			return nil, err
+		}
+		all[key] = value
 	}
+	return all, nil
 }

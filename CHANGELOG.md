@@ -12,9 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `jdm config set download_mirror` 现在写入 `proxy` 并提示旧名称已弃用，修复命令提示成功但配置文件未更新的问题 (IKE2JB)
-- 加载旧版配置时把 `download_mirror` 迁移为 `proxy`，升级用户已有的自定义代理继续生效
+- 加载旧版配置时把 `download_mirror` 视为 `proxy`，升级用户已有的自定义代理继续生效，保存后写回规范键
 - `jdm config get aliases` 和 `jdm config list` 现在显示版本别名；`jdm config set aliases` 提示改用 `jdm alias set/del`
-- `jdm config set` 遇到未知配置项时直接报错并列出支持的配置项，不再静默成功
+- `jdm config set` 遇到未知配置项时直接报错并列出可写配置项，不再静默成功
 - 安装程序不再单独选择 JDK 存储位置，`jdk_home` 固定为安装目录下的 `versions`，修复 `jdm ls` 把目录名当作版本号 (IKE2IU)
 - 安装程序把 `<JDM_HOME>\current\bin` 写入 PATH，此前误写为 `versions\current\bin`
 - 卸载时从 `JDM_HOME` 读取实际安装路径，并删除残留的 `current` 链接与 PATH 项 (IKE2IP)

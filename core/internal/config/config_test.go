@@ -80,11 +80,11 @@ func TestConfig_SetLegacyDownloadMirrorKey(t *testing.T) {
 		t.Fatalf("failed to set legacy key: %v", err)
 	}
 
-	if got := cfg.Get("proxy"); got != mirror {
-		t.Errorf("expected proxy %q, got %q", mirror, got)
+	if got, err := cfg.Get("proxy"); err != nil || got != mirror {
+		t.Errorf("expected proxy %q, got %q (err: %v)", mirror, got, err)
 	}
-	if got := cfg.Get("download_mirror"); got != mirror {
-		t.Errorf("expected legacy key to resolve to %q, got %q", mirror, got)
+	if got, err := cfg.Get("download_mirror"); err != nil || got != mirror {
+		t.Errorf("expected legacy key to resolve to %q, got %q (err: %v)", mirror, got, err)
 	}
 
 	// 配置文件中必须写入规范名称，而不是旧名称
@@ -113,8 +113,15 @@ func TestConfig_SetUnknownKey(t *testing.T) {
 	tmpDir := t.TempDir()
 	cfg := NewConfig(tmpDir)
 
-	if err := cfg.Set("mirorr", "https://mirror.example.com"); err == nil {
+	err := cfg.Set("mirorr", "https://mirror.example.com")
+	if err == nil {
 		t.Fatal("expected an error for an unknown config key")
+	}
+	if !strings.Contains(err.Error(), "settable:") {
+		t.Errorf("expected error to list settable keys, got %v", err)
+	}
+	if strings.Contains(err.Error(), aliasesKey) {
+		t.Errorf("unknown-key error must not advertise aliases as settable, got %v", err)
 	}
 
 	if _, err := os.Stat(filepath.Join(tmpDir, "config.json")); !os.IsNotExist(err) {
@@ -125,16 +132,16 @@ func TestConfig_SetUnknownKey(t *testing.T) {
 func TestConfig_GetAliases(t *testing.T) {
 	cfg := NewConfig(t.TempDir())
 
-	if got := cfg.Get("aliases"); got != "{}" {
-		t.Errorf("expected empty aliases as %q, got %q", "{}", got)
+	if got, err := cfg.Get("aliases"); err != nil || got != "{}" {
+		t.Errorf("expected empty aliases as %q, got %q (err: %v)", "{}", got, err)
 	}
 
 	cfg.SetAlias("myjdk", "17.0.2+2")
 	cfg.SetAlias("lts", "21")
 
 	const want = `{"lts":"21","myjdk":"17.0.2+2"}`
-	if got := cfg.Get("aliases"); got != want {
-		t.Errorf("expected aliases %s, got %s", want, got)
+	if got, err := cfg.Get("aliases"); err != nil || got != want {
+		t.Errorf("expected aliases %s, got %s (err: %v)", want, got, err)
 	}
 }
 
@@ -142,8 +149,12 @@ func TestConfig_GetAllIncludesAliases(t *testing.T) {
 	cfg := NewConfig(t.TempDir())
 	cfg.SetAlias("myjdk", "17.0.2+2")
 
+	all, err := cfg.GetAll()
+	if err != nil {
+		t.Fatalf("failed to get all config: %v", err)
+	}
 	const want = `{"myjdk":"17.0.2+2"}`
-	if got := cfg.GetAll()["aliases"]; got != want {
+	if got := all["aliases"]; got != want {
 		t.Errorf("expected aliases in config list %s, got %s", want, got)
 	}
 }
@@ -162,6 +173,54 @@ func TestConfig_SetAliasesRejected(t *testing.T) {
 
 	if _, statErr := os.Stat(filepath.Join(tmpDir, "config.json")); !os.IsNotExist(statErr) {
 		t.Errorf("rejected aliases set must not write a config file, stat error: %v", statErr)
+	}
+}
+
+func TestCanonicalKey(t *testing.T) {
+	tests := []struct {
+		key  string
+		want string
+	}{
+		{"mirror", mirrorKey},
+		{"MIRROR", mirrorKey},
+		{"Proxy", proxyKey},
+		{LegacyProxyKey, proxyKey},
+		{"Download_Mirror", proxyKey},
+		{"aliases", aliasesKey},
+		{"mirorr", "mirorr"},
+	}
+
+	for _, tt := range tests {
+		if got := CanonicalKey(tt.key); got != tt.want {
+			t.Errorf("CanonicalKey(%q) = %q, want %q", tt.key, got, tt.want)
+		}
+	}
+
+	if !IsDeprecatedKey("Download_Mirror") {
+		t.Error("expected Download_Mirror to be reported as deprecated")
+	}
+	if IsDeprecatedKey(proxyKey) {
+		t.Error("expected proxy not to be reported as deprecated")
+	}
+}
+
+func TestConfig_SetKeyCaseInsensitive(t *testing.T) {
+	cfg := NewConfig(t.TempDir())
+
+	const proxy = "https://proxy.example.com"
+	if err := cfg.Set("PROXY", proxy); err != nil {
+		t.Fatalf("failed to set proxy with different case: %v", err)
+	}
+	if cfg.Proxy != proxy {
+		t.Errorf("expected proxy %q, got %q", proxy, cfg.Proxy)
+	}
+
+	got, err := cfg.Get("Proxy")
+	if err != nil {
+		t.Fatalf("failed to get proxy with different case: %v", err)
+	}
+	if got != proxy {
+		t.Errorf("expected proxy %q, got %q", proxy, got)
 	}
 }
 

@@ -268,6 +268,16 @@ go build -ldflags "-X github.com/xjtuer216/jdm/internal/jdk.Version=1.0.0" -o jd
 ### Testing
 
 ```bash
+# Full check (gofmt + go vet + go test)
+./scripts/check.sh
+
+# Enable the tracked pre-push guardrail
+./scripts/setup-hooks.sh
+```
+
+Or run the tests directly:
+
+```bash
 cd core && go test ./...
 ```
 

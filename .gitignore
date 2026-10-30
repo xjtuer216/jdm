@@ -14,14 +14,17 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
-# IDE and tool directories
+# Legacy tooling directories (no longer used)
 .claude
 .cursor
 .trellis
 .sisyphus
+
+# Docs (only the listed subdirectories are tracked)
 docs/*
 !docs/agents/
 !docs/adr/
+!docs/history/
 
 # Installer build outputs
 installer/dist/

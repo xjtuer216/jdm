@@ -268,6 +268,16 @@ go build -ldflags "-X github.com/xjtuer216/jdm/internal/jdk.Version=1.0.0" -o jd
 ### 测试
 
 ```bash
+# 全部检查（gofmt + go vet + go test）
+./scripts/check.sh
+
+# 启用仓库自带的 pre-push 检查
+./scripts/setup-hooks.sh
+```
+
+也可以单独运行：
+
+```bash
 cd core && go test ./...
 ```
 

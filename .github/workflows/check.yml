@@ -9,7 +9,8 @@ permissions:
 
 jobs:
   go:
-    runs-on: ubuntu-latest
+    # JDM is a Windows-only tool: run the guardrail on the target OS.
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -18,3 +19,4 @@ jobs:
           cache: true
           cache-dependency-path: core/go.sum
       - run: ./scripts/check.sh
+        shell: bash

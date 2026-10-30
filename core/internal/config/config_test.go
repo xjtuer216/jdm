@@ -317,6 +317,54 @@ func TestConfig_JDKMirrorRoundTrip(t *testing.T) {
 	}
 }
 
+func TestConfig_EverySettableKeyRoundTrips(t *testing.T) {
+	samples := map[string]string{
+		jdmHomeKey:   "",
+		jdkHomeKey:   "",
+		mirrorKey:    "https://api.example.com",
+		jdkMirrorKey: "https://mirror.example.com/Adoptium",
+		proxyKey:     "https://proxy.example.com",
+		defaultKey:   "17.0.2+2",
+	}
+
+	for _, key := range SettableKeys() {
+		t.Run(key, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			value, ok := samples[key]
+			if !ok {
+				t.Fatalf("no sample value for settable key %q", key)
+			}
+			switch key {
+			case jdmHomeKey:
+				value = filepath.Join(tmpDir, "home")
+			case jdkHomeKey:
+				value = filepath.Join(tmpDir, "versions")
+			}
+
+			cfg := NewConfig(tmpDir)
+			if got := CanonicalKey(key); got != key {
+				t.Errorf("CanonicalKey(%q) = %q, want %q", key, got, key)
+			}
+			if cfg.scalarField(key) == nil {
+				t.Fatalf("settable key %q has no scalar field", key)
+			}
+			if err := cfg.Set(key, value); err != nil {
+				t.Fatalf("failed to set %q: %v", key, err)
+			}
+			if got, err := cfg.Get(key); err != nil || got != value {
+				t.Errorf("Get(%q) = %q (err: %v), want %q", key, got, err, value)
+			}
+			all, err := cfg.GetAll()
+			if err != nil {
+				t.Fatalf("failed to get all config: %v", err)
+			}
+			if _, ok := all[key]; !ok {
+				t.Errorf("GetAll() is missing settable key %q", key)
+			}
+		})
+	}
+}
+
 func TestConfig_EffectiveSourceValues(t *testing.T) {
 	cfg := NewConfig(t.TempDir())
 

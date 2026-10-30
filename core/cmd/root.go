@@ -92,7 +92,8 @@ EXAMPLES:
   jdm use 17                  # Switch to JDK 17
   jdm default 17              # Set JDK 17 as default
   jdm alias set myjdk 17.0.2  # Create an alias for a version
-  jdm config set mirror <url> # Set custom download mirror
+  jdm config set jdk_mirror <url> # Set JDK download source (none disables)
+  jdm config set mirror <url>     # Set Adoptium API base URL
 
 GETTING STARTED:
   1. Run 'jdm install <version>' to install a JDK version

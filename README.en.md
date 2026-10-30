@@ -22,7 +22,7 @@ JDM (JDK Version Manager) is a JDK version management tool for Windows, similar 
 - **Quick Switching** - Instantly switch JDK versions using symbolic links, no terminal restart needed
 - **Version Listing** - View locally installed and remotely available versions with automatic LTS detection
 - **Alias Management** - Set custom aliases for frequently used versions
-- **Download Acceleration** - Built-in GitHub download proxy, no VPN needed for users in China
+- **Domestic Download Source** - Uses the Tsinghua TUNA download source by default, falls back to GitHub when a file is missing or fails verification
 - **Progress Display** - Real-time progress and speed tracking during download and extraction
 - **No Admin Required** - Automatic fallback to Directory Junction when symlinks fail, no administrator privileges needed
 - **Flexible Configuration** - Custom mirror sources, installation directories, and dual-layer config
@@ -99,9 +99,13 @@ jdm config list
 
 # Get a configuration value
 jdm config get mirror
+jdm config get jdk_mirror
 
-# Set a mirror source
-jdm config set mirror https://api.adoptium.net/v3
+# Set the JDK download source (Tsinghua TUNA by default)
+jdm config set jdk_mirror https://mirrors.tuna.tsinghua.edu.cn/Adoptium
+
+# Disable the download source and use GitHub directly
+jdm config set jdk_mirror none
 
 # Initialize configuration file
 jdm config init
@@ -122,26 +126,59 @@ jdm config init
 |--------|-------------|---------|
 | `jdm_home` | JDM main directory | `~/.jdm` |
 | `jdk_home` | JDK installation directory | `~/.jdm/versions` |
-| `mirror` | Adoptium API mirror | `https://api.adoptium.net/v3` |
-| ~~`download_mirror`~~ → `proxy` | GitHub download proxy (`download_mirror` is deprecated but still accepted as an alias) | `https://ghproxy.net` |
+| `mirror` | Metadata source: Adoptium API base URL | `https://api.adoptium.net` |
+| `jdk_mirror` | Download source base URL; `none` disables it | `https://mirrors.tuna.tsinghua.edu.cn/Adoptium` |
+| ~~`download_mirror`~~ → `proxy` | GitHub download proxy (`download_mirror` is deprecated but still accepted as an alias); `none` disables it | `https://ghproxy.net` |
 | `default` | Default JDK version | (not set) |
 | `aliases` | Version aliases (read-only; manage with `jdm alias`) | `{}` |
 
-### Custom Mirror Sources
+### Download Source and Mirrors
 
-Users in China can configure a domestic mirror for faster downloads:
+A JDK installation makes two independent kinds of network requests, controlled by different options:
+
+| Stage | Option | Purpose |
+|-------|--------|---------|
+| Metadata | `mirror` | Adoptium API base URL: resolves exact versions, file names, sizes, and SHA-256 |
+| Download | `jdk_mirror` | Download source that serves JDK archives under a fixed directory layout |
+| Download | `proxy` | Prefixes github.com URLs only; it does not understand mirror directory layouts |
+
+The download candidate chain, tried in order (one attempt per source):
+
+1. `jdk_mirror`, built as `{base}/{major}/jdk/x64/windows/{file name}` (the file name is taken verbatim from the metadata source)
+2. `proxy` + the original GitHub URL
+3. The original GitHub URL
+
+Every source is verified against the byte size and SHA-256 from the metadata source. HTML error pages, truncated files, and checksum mismatches all count as failures, and the next source is tried; if everything fails, the reason for each source is reported. On success, JDM prints the source that was actually used.
+
+Users in China get the Tsinghua TUNA source by default with no configuration. You can switch or disable it:
 
 ```powershell
-jdm config set mirror https://mirrors.aliyun.com/Adoptium
+# Switch the download source
+jdm config set jdk_mirror https://mirrors.tuna.tsinghua.edu.cn/Adoptium
+
+# Disable it and use GitHub directly
+jdm config set jdk_mirror none
+
+# Or edit ~/.jdm/config.json directly
 ```
 
-Or edit the configuration file directly:
+Available download sources (tested on 2026-10-30):
 
-```json
-{
-  "mirror": "https://mirrors.aliyun.com/Adoptium"
-}
-```
+| Site | Base URL | Coverage and limitations |
+|------|----------|--------------------------|
+| Tsinghua TUNA (default) | `https://mirrors.tuna.tsinghua.edu.cn/Adoptium` | Covers 8/11/17/21/25; keeps only the latest GA per major, so patches may lag behind the Adoptium API |
+| Nanjing University | `https://mirror.nju.edu.cn/adoptium` | Lowercase path; syncs irregularly |
+| Lanzhou University | `https://mirror.lzu.edu.cn/Adoptium` | Syncs irregularly |
+| CERNET | `https://mirrors.cernet.edu.cn/Adoptium` | Redirects (302) to a nearby site |
+
+These sites are **not usable**: Huawei Cloud returns HTTP 200 with HTML for any path; USTC only keeps the old layout; Aliyun, Tencent Cloud, and others have no Adoptium directory. JDM detects HTML/404 responses and falls back to GitHub.
+
+Known limitations:
+
+- Mirrors only sync a subset of releases. When the API resolves a newer patch that the mirror has not synced yet, JDM falls back to GitHub, so the first install can be slower than expected.
+- Mirrors do not implement the Adoptium API. Keep `mirror` pointed at the official API; pointing it at a mirror breaks version resolution.
+- The download layout is fixed to Windows x64. Non-Windows platforms and arm64 are out of scope.
+- A self-hosted mirror only needs to expose the same directory layout; both http and custom paths are supported.
 
 ## Environment Variables
 
@@ -192,8 +229,10 @@ A: JDM has a built-in fallback mechanism. When symlink creation fails, it automa
 
 ### Q: JDK installation fails
 
-A: Check your network connection and ensure the mirror source is accessible. Users in China can configure a download proxy:
+A: Check your network connection and make sure both the metadata source and the download source are reachable. Users in China get the Tsinghua TUNA source by default; you can also switch or disable it explicitly:
 ```powershell
+jdm config set jdk_mirror https://mirrors.tuna.tsinghua.edu.cn/Adoptium
+jdm config set jdk_mirror none   # use GitHub directly
 jdm config set proxy https://ghproxy.net
 ```
 

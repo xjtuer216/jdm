@@ -22,7 +22,7 @@ JDM (JDK Version Manager) 是一个 Windows 平台下的 JDK 版本管理工具�
 - **快速切换** - 瞬时切换 JDK 版本，基于符号链接技术，无需重启终端
 - **版本列表** - 查看本地已安装和远程可用版本，自动识别 LTS 版本
 - **别名管理** - 为常用版本设置自定义别名
-- **下载加速** - 内置 GitHub 下载代理，国内用户无需科学上网
+- **国内下载源** - 默认使用清华 TUNA 下载源，镜像缺失或不匹配时自动回退 GitHub
 - **进度显示** - 下载和解压过程实时显示进度和速度
 - **免管理员** - 符号链接失败时自动回退到目录联接（Junction），无需管理员权限
 - **配置灵活** - 支持自定义镜像源、安装目录和双层配置
@@ -99,9 +99,13 @@ jdm config list
 
 # 获取配置项
 jdm config get mirror
+jdm config get jdk_mirror
 
-# 设置镜像源
-jdm config set mirror https://api.adoptium.net/v3
+# 设置 JDK 下载源（默认清华 TUNA）
+jdm config set jdk_mirror https://mirrors.tuna.tsinghua.edu.cn/Adoptium
+
+# 禁用下载源，完全回到 GitHub
+jdm config set jdk_mirror none
 
 # 初始化配置文件
 jdm config init
@@ -122,26 +126,59 @@ jdm config init
 |--------|------|--------|
 | `jdm_home` | JDM 主目录 | `~/.jdm` |
 | `jdk_home` | JDK 安装目录 | `~/.jdm/versions` |
-| `mirror` | Adoptium API 镜像 | `https://api.adoptium.net/v3` |
-| ~~`download_mirror`~~ `proxy` | GitHub 下载代理（`download_mirror` 已弃用，仍作为别名接受并提示） | `https://ghproxy.net` |
+| `mirror` | 元数据源：Adoptium API 基址 | `https://api.adoptium.net` |
+| `jdk_mirror` | 下载源基址；`none` 表示禁用 | `https://mirrors.tuna.tsinghua.edu.cn/Adoptium` |
+| ~~`download_mirror`~~ `proxy` | GitHub 下载代理（`download_mirror` 已弃用，仍作为别名接受并提示）；`none` 表示禁用 | `https://ghproxy.net` |
 | `default` | 默认 JDK 版本 | (未设置) |
 | `aliases` | 版本别名（只读，使用 `jdm alias` 管理） | `{}` |
 
-### 自定义镜像源
+### 下载源与镜像
 
-国内用户可以配置国内镜像加速下载：
+JDK 安装涉及两段独立的网络访问，分别由不同配置项控制：
+
+| 阶段 | 配置项 | 作用 |
+|------|--------|------|
+| 元数据 | `mirror` | Adoptium API 基址，解析精确版本、文件名、字节数与 SHA-256 |
+| 下载 | `jdk_mirror` | 按固定目录布局提供 JDK 归档的下载源 |
+| 下载 | `proxy` | 只给 github.com 链接加前缀的代理，不参与镜像目录解析 |
+
+安装时的候选链如下，每个来源只尝试一次，失败自动换下一个：
+
+1. `jdk_mirror`，按 `{base}/{major}/jdk/x64/windows/{文件名}` 拼出地址（文件名逐字取自元数据源）
+2. `proxy` + 原始 GitHub 链接
+3. 原始 GitHub 链接
+
+所有来源都校验元数据给出的字节数与 SHA-256。镜像返回 HTML 错误页、截断文件或摘要不符都会判为失败并换源；全部失败时会列出每个来源的原因。成功时输出实际使用的来源。
+
+国内用户默认就走清华 TUNA，无需额外配置。也可以切换或禁用：
 
 ```powershell
-jdm config set mirror https://mirrors.aliyun.com/Adoptium
+# 切换下载源
+jdm config set jdk_mirror https://mirrors.tuna.tsinghua.edu.cn/Adoptium
+
+# 禁用下载源，完全回到 GitHub
+jdm config set jdk_mirror none
+
+# 也可以直接编辑 ~/.jdm/config.json
 ```
 
-或者直接编辑配置文件：
+可用下载源（实测于 2026-10-30）：
 
-```json
-{
-  "mirror": "https://mirrors.aliyun.com/Adoptium"
-}
-```
+| 站点 | 基址 | 覆盖与限制 |
+|------|------|-----------|
+| 清华 TUNA（默认） | `https://mirrors.tuna.tsinghua.edu.cn/Adoptium` | 覆盖 8/11/17/21/25；每个大版本只保留最新 GA，补丁可能滞后于 Adoptium API |
+| 南京大学 | `https://mirror.nju.edu.cn/adoptium` | 路径为小写；同步不定期 |
+| 兰州大学 | `https://mirror.lzu.edu.cn/Adoptium` | 同步不定期 |
+| CERNET | `https://mirrors.cernet.edu.cn/Adoptium` | 302 跳转到就近站点 |
+
+以下站点**不可用**：华为云对任意路径返回 200 HTML；中科大只有旧目录布局；阿里云、腾讯云等没有 Adoptium 目录。JDM 会判定 HTML/404 并回退 GitHub。
+
+已知限制：
+
+- 镜像站只同步部分版本。API 解析出最新补丁而镜像尚未同步时，会自动回退 GitHub，因此首次安装可能比预期慢。
+- 镜像站不实现 Adoptium API，`mirror` 必须保持官方地址；把 `mirror` 指向镜像站会导致版本查询失败。
+- 下载源当前固定为 Windows x64 布局，非 Windows 平台与 arm64 不在支持范围。
+- 自建镜像只需提供相同的目录布局，支持 http 与自定义路径。
 
 ## 环境变量
 
@@ -192,8 +229,10 @@ A: JDM 已内置回退机制。当符号链接创建失败时，会自动使用�
 
 ### Q: 安装 JDK 失败
 
-A: 检查网络连接，确保可以访问镜像源。国内用户可以配置下载代理：
+A: 检查网络连接，确保可以访问元数据源与下载源。国内用户默认使用清华 TUNA 下载源，也可显式切换或禁用：
 ```powershell
+jdm config set jdk_mirror https://mirrors.tuna.tsinghua.edu.cn/Adoptium
+jdm config set jdk_mirror none   # 完全回到 GitHub
 jdm config set proxy https://ghproxy.net
 ```
 

@@ -187,6 +187,7 @@ func TestCanonicalKey(t *testing.T) {
 		{LegacyProxyKey, proxyKey},
 		{"Download_Mirror", proxyKey},
 		{"aliases", aliasesKey},
+		{"JDK_MIRROR", jdkMirrorKey},
 		{"mirorr", "mirorr"},
 	}
 
@@ -221,6 +222,128 @@ func TestConfig_SetKeyCaseInsensitive(t *testing.T) {
 	}
 	if got != proxy {
 		t.Errorf("expected proxy %q, got %q", proxy, got)
+	}
+}
+
+func TestConfig_DefaultJDKMirror(t *testing.T) {
+	const want = "https://mirrors.tuna.tsinghua.edu.cn/Adoptium"
+	if DefaultJDKMirror != want {
+		t.Fatalf("DefaultJDKMirror = %q, want %q", DefaultJDKMirror, want)
+	}
+
+	cfg := NewConfig(t.TempDir())
+	if cfg.JDKMirror != want {
+		t.Errorf("expected new config jdk_mirror %q, got %q", want, cfg.JDKMirror)
+	}
+}
+
+func TestConfig_SetJDKMirror(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    string
+		wantErr bool
+	}{
+		{name: "http url", input: "http://10.0.0.8:8080/Adoptium/", want: "http://10.0.0.8:8080/Adoptium"},
+		{name: "https url", input: "https://mirrors.example.com/Adoptium//", want: "https://mirrors.example.com/Adoptium"},
+		{name: "none", input: "none", want: "none"},
+		{name: "none is case-insensitive", input: "NONE", want: "none"},
+		{name: "missing host", input: "https://", wantErr: true},
+		{name: "missing scheme", input: "mirrors.example.com/Adoptium", wantErr: true},
+		{name: "unsupported scheme", input: "ftp://mirrors.example.com/Adoptium", wantErr: true},
+		{name: "preset name", input: "tuna", wantErr: true},
+		{name: "empty", input: "", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			cfg := NewConfig(tmpDir)
+
+			err := cfg.Set("jdk_mirror", tt.input)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected setting jdk_mirror %q to fail", tt.input)
+				}
+				if _, statErr := os.Stat(filepath.Join(tmpDir, "config.json")); !os.IsNotExist(statErr) {
+					t.Errorf("rejected jdk_mirror must not write a config file, stat error: %v", statErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("failed to set jdk_mirror: %v", err)
+			}
+			if cfg.JDKMirror != tt.want {
+				t.Errorf("expected jdk_mirror %q, got %q", tt.want, cfg.JDKMirror)
+			}
+
+			reloaded := NewConfig(tmpDir)
+			if err := reloaded.Load(); err != nil {
+				t.Fatalf("failed to reload config: %v", err)
+			}
+			if reloaded.JDKMirror != tt.want {
+				t.Errorf("expected reloaded jdk_mirror %q, got %q", tt.want, reloaded.JDKMirror)
+			}
+		})
+	}
+}
+
+func TestConfig_JDKMirrorRoundTrip(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := NewConfig(tmpDir)
+
+	const want = "https://mirror.example.com/adoptium"
+	if err := cfg.Set("JDK_MIRROR", want+"/"); err != nil {
+		t.Fatalf("failed to set jdk_mirror with different case: %v", err)
+	}
+
+	if got, err := cfg.Get("jdk_mirror"); err != nil || got != want {
+		t.Errorf("expected jdk_mirror %q, got %q (err: %v)", want, got, err)
+	}
+	all, err := cfg.GetAll()
+	if err != nil {
+		t.Fatalf("failed to get all config: %v", err)
+	}
+	if all["jdk_mirror"] != want {
+		t.Errorf("expected config list to include jdk_mirror %q, got %q", want, all["jdk_mirror"])
+	}
+
+	reloaded := NewConfig(tmpDir)
+	if err := reloaded.Load(); err != nil {
+		t.Fatalf("failed to reload config: %v", err)
+	}
+	if reloaded.JDKMirror != want {
+		t.Errorf("expected reloaded jdk_mirror %q, got %q", want, reloaded.JDKMirror)
+	}
+}
+
+func TestConfig_EffectiveSourceValues(t *testing.T) {
+	cfg := NewConfig(t.TempDir())
+
+	tests := []struct {
+		name   string
+		mirror string
+		proxy  string
+		wantJ  string
+		wantP  string
+	}{
+		{name: "defaults", mirror: DefaultJDKMirror, proxy: DefaultProxy, wantJ: DefaultJDKMirror, wantP: DefaultProxy},
+		{name: "none disables both", mirror: "NONE", proxy: "none", wantJ: "", wantP: ""},
+		{name: "empty disables both", mirror: "", proxy: "", wantJ: "", wantP: ""},
+		{name: "trailing slash stripped", mirror: "https://mirror.example.com/Adoptium/", proxy: "https://ghproxy.net/", wantJ: "https://mirror.example.com/Adoptium", wantP: "https://ghproxy.net"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg.JDKMirror = tt.mirror
+			cfg.Proxy = tt.proxy
+			if got := cfg.EffectiveDownloadMirror(); got != tt.wantJ {
+				t.Errorf("EffectiveDownloadMirror() = %q, want %q", got, tt.wantJ)
+			}
+			if got := cfg.EffectiveProxy(); got != tt.wantP {
+				t.Errorf("EffectiveProxy() = %q, want %q", got, tt.wantP)
+			}
+		})
 	}
 }
 

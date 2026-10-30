@@ -1,7 +1,7 @@
 # JDM - JDK Version Manager
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.1.1-blue" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows-green" alt="Platform">
   <img src="https://img.shields.io/badge/language-Go-blue" alt="Language">
   <img src="https://img.shields.io/badge/license-MIT-orange" alt="License">

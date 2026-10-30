@@ -255,6 +255,7 @@ func TestDownloader_CleansUpTempFilesAfterVerificationFailure(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("TMP", tmpDir)
 	t.Setenv("TEMP", tmpDir)
+	t.Setenv("TMPDIR", tmpDir)
 
 	payload := []byte("PK\x03\x04partial-download")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

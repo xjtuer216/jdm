@@ -21,6 +21,7 @@
 .sisyphus
 docs/*
 !docs/agents/
+!docs/adr/
 
 # Installer build outputs
 installer/dist/

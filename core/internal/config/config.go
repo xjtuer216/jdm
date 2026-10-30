@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,21 +16,27 @@ const (
 	// DefaultProxy 是默认的 JDK 下载代理地址
 	// 使用 ghproxy.net 代理 GitHub Releases 下载
 	DefaultProxy = "https://ghproxy.net"
+	// DefaultJDKMirror 是默认的 JDK 下载源地址（清华 TUNA Adoptium 镜像）
+	DefaultJDKMirror = "https://mirrors.tuna.tsinghua.edu.cn/Adoptium"
 	// ConfigFileName 是配置文件名
 	ConfigFileName = "config.json"
 	// LegacyProxyKey 是 proxy 的旧名称（v0.1.1 前），仍作为别名接受
 	LegacyProxyKey = "download_mirror"
 
-	jdmHomeKey = "jdm_home"
-	jdkHomeKey = "jdk_home"
-	mirrorKey  = "mirror"
-	proxyKey   = "proxy"
-	defaultKey = "default"
-	aliasesKey = "aliases"
+	// noneValue 是禁用下载源或代理时使用的配置值
+	noneValue = "none"
+
+	jdmHomeKey   = "jdm_home"
+	jdkHomeKey   = "jdk_home"
+	mirrorKey    = "mirror"
+	jdkMirrorKey = "jdk_mirror"
+	proxyKey     = "proxy"
+	defaultKey   = "default"
+	aliasesKey   = "aliases"
 )
 
 // settableKeys 是可通过 config set 修改的标量配置项
-var settableKeys = []string{jdmHomeKey, jdkHomeKey, mirrorKey, proxyKey, defaultKey}
+var settableKeys = []string{jdmHomeKey, jdkHomeKey, mirrorKey, jdkMirrorKey, proxyKey, defaultKey}
 
 // readableKeys 是 config get/list 可读取的配置项，aliases 是其中唯一的映射项
 var readableKeys = append(append([]string{}, settableKeys...), aliasesKey)
@@ -69,12 +76,13 @@ func CanonicalKey(key string) string {
 }
 
 type Config struct {
-	JDMHome        string            `json:"jdm_home"`
-	JDKHome        string            `json:"jdk_home"`
-	Mirror         string            `json:"mirror"`
-	Proxy          string            `json:"proxy"`
-	Default        string            `json:"default"`
-	Aliases        map[string]string `json:"aliases"`
+	JDMHome   string            `json:"jdm_home"`
+	JDKHome   string            `json:"jdk_home"`
+	Mirror    string            `json:"mirror"`
+	JDKMirror string            `json:"jdk_mirror"`
+	Proxy     string            `json:"proxy"`
+	Default   string            `json:"default"`
+	Aliases   map[string]string `json:"aliases"`
 }
 
 // 配置来源标识
@@ -135,12 +143,13 @@ func NewConfig(jdmHome string) *Config {
 		jdkHome = jdmHome + "versions"
 	}
 	return &Config{
-		JDMHome: jdmHome,
-		JDKHome: jdkHome,
-		Mirror:  DefaultMirror,
-		Proxy:   DefaultProxy,
-		Default: "",
-		Aliases: make(map[string]string),
+		JDMHome:   jdmHome,
+		JDKHome:   jdkHome,
+		Mirror:    DefaultMirror,
+		JDKMirror: DefaultJDKMirror,
+		Proxy:     DefaultProxy,
+		Default:   "",
+		Aliases:   make(map[string]string),
 	}
 }
 
@@ -177,6 +186,9 @@ func (c *Config) Load() error {
 				// 使用安装配置中的值（如果存在）
 				if installConfig.Mirror != "" && installConfig.Mirror != DefaultMirror {
 					c.Mirror = installConfig.Mirror
+				}
+				if installConfig.JDKMirror != "" {
+					c.JDKMirror = installConfig.JDKMirror
 				}
 				if installConfig.Proxy != "" {
 					c.Proxy = installConfig.Proxy
@@ -252,10 +264,11 @@ func (c *Config) SaveToInstallDir() error {
 
 	// 只保存必要的配置项到安装目录
 	installConfig := map[string]string{
-		"jdm_home": c.JDMHome,
-		"jdk_home": c.JDKHome,
-		"mirror":   c.Mirror,
-		"proxy":    c.Proxy,
+		"jdm_home":   c.JDMHome,
+		"jdk_home":   c.JDKHome,
+		"mirror":     c.Mirror,
+		"jdk_mirror": c.JDKMirror,
+		"proxy":      c.Proxy,
 	}
 
 	data, err := json.MarshalIndent(installConfig, "", "  ")
@@ -285,6 +298,8 @@ func (c *Config) scalarField(canonicalKey string) *string {
 		return &c.JDKHome
 	case mirrorKey:
 		return &c.Mirror
+	case jdkMirrorKey:
+		return &c.JDKMirror
 	case proxyKey:
 		return &c.Proxy
 	case defaultKey:
@@ -316,8 +331,49 @@ func (c *Config) Set(key, value string) error {
 	if field == nil {
 		return fmt.Errorf("unknown config key %q (settable: %s)", key, strings.Join(settableKeys, ", "))
 	}
+	if canonical == jdkMirrorKey {
+		normalized, err := normalizeJDKMirror(value)
+		if err != nil {
+			return err
+		}
+		value = normalized
+	}
 	*field = value
 	return c.Save()
+}
+
+// normalizeJDKMirror 校验下载源取值：http(s) 完整地址或 none
+// 合法地址去掉末尾的 /，none 统一保存为小写
+func normalizeJDKMirror(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if strings.EqualFold(value, noneValue) {
+		return noneValue, nil
+	}
+
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return "", fmt.Errorf("invalid jdk_mirror %q: use an http(s) URL or %q", value, noneValue)
+	}
+	return strings.TrimRight(value, "/"), nil
+}
+
+// EffectiveDownloadMirror 返回生效的下载源基址，未配置或设为 none 时返回空字符串
+func (c *Config) EffectiveDownloadMirror() string {
+	return effectiveURL(c.JDKMirror)
+}
+
+// EffectiveProxy 返回生效的代理前缀，未配置或设为 none 时返回空字符串
+func (c *Config) EffectiveProxy() string {
+	return effectiveURL(c.Proxy)
+}
+
+// effectiveURL 把 none 与空值视为禁用，并去掉末尾的 /
+func effectiveURL(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" || strings.EqualFold(value, noneValue) {
+		return ""
+	}
+	return strings.TrimRight(value, "/")
 }
 
 // formatAliases 把别名映射序列化为 JSON，供 config get/list 展示

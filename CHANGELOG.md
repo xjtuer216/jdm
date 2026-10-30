@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- 新增 `jdk_mirror` 下载源配置，默认清华 TUNA；安装时按镜像布局下载，失败或校验不符时依次回退 `proxy` + GitHub、GitHub 直连 (IKRUWJ)
+- 下载按 Adoptium 元数据校验字节数与 SHA-256；镜像返回 HTML、截断文件或摘要不符时判为失败并换源
+- 全部来源失败时汇总每个来源的失败原因；成功时输出实际使用的下载来源
+
+### Changed
+
+- 所有 HTTP 请求统一携带 `User-Agent: JDM/<version>`，避免镜像站拒绝默认 UA
+- `jdk_mirror` 与 `proxy` 支持用 `none` 禁用，`jdm config list` 显示下载源
+
+### Fixed
+
+- README 中 `mirror` 默认值误写为 `https://api.adoptium.net/v3`，修正为 `https://api.adoptium.net`
+- README 移除实测 404 的阿里云 Adoptium 示例
+
 ## [0.1.1] - 2026-10-30
 
 ### Fixed

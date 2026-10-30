@@ -2,6 +2,7 @@
   "jdm_home": "",
   "jdk_home": "",
   "mirror": "https://api.adoptium.net",
+  "jdk_mirror": "https://mirrors.tuna.tsinghua.edu.cn/Adoptium",
   "proxy": "https://ghproxy.net",
   "default": "",
   "aliases": {}

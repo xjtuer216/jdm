@@ -3,6 +3,7 @@ package file
 import (
 	"archive/tar"
 	"archive/zip"
+	"compress/gzip"
 	"fmt"
 	"io"
 	"os"
@@ -134,7 +135,9 @@ func CopyFile(src, dst string) error {
 	return err
 }
 
-// Extract extracts an archive (zip or tar.gz) to the destination directory
+// Extract extracts an archive (zip or tar.gz) to the destination directory.
+// An archive whose entries share one top-level directory has that directory
+// stripped, so dest becomes the archive's content root.
 func Extract(archive, dest string) error {
 	return ExtractWithProgress(archive, dest, nil)
 }
@@ -159,6 +162,72 @@ func ExtractWithProgress(archive, dest string, progress func(current, total int6
 	return fmt.Errorf("unsupported archive format: %s", archive)
 }
 
+// normalizeArchiveEntry converts an archive entry name to a clean relative
+// path with forward slashes, so names from different writers compare equally.
+func normalizeArchiveEntry(name string) string {
+	name = strings.ReplaceAll(name, "\\", "/")
+	name = strings.TrimPrefix(name, "./")
+	return strings.TrimLeft(name, "/")
+}
+
+// rootDirDetector tracks the top-level directory shared by archive entries.
+type rootDirDetector struct {
+	root       string
+	hasSubpath bool
+	multiple   bool
+}
+
+// Add records an archive entry name.
+func (d *rootDirDetector) Add(name string) {
+	name = normalizeArchiveEntry(name)
+	if name == "" {
+		return
+	}
+
+	first, rest, found := strings.Cut(name, "/")
+	if found && rest != "" {
+		d.hasSubpath = true
+	}
+	if d.root == "" {
+		d.root = first
+	} else if first != d.root {
+		d.multiple = true
+	}
+}
+
+// Root returns the single top-level directory that wraps every entry, or ""
+// when entries are flat or live under multiple roots. A root is only reported
+// when at least one entry has a subpath, so a lone top-level file is kept.
+func (d *rootDirDetector) Root() string {
+	if d.multiple || !d.hasSubpath || d.root == "" || d.root == "." || d.root == ".." {
+		return ""
+	}
+	return d.root
+}
+
+// stripArchiveRoot removes root from an already-normalized entry name.
+// ok is false when the entry is the root directory itself, a no-op ".",
+// or empty, meaning there is no content to extract.
+func stripArchiveRoot(name, root string) (string, bool) {
+	if name == "" || name == "." {
+		return "", false
+	}
+	if root == "" {
+		return name, true
+	}
+	if name == root {
+		return "", false
+	}
+	rest, ok := strings.CutPrefix(name, root+"/")
+	if !ok {
+		return name, true
+	}
+	if rest == "" {
+		return "", false
+	}
+	return rest, true
+}
+
 func extractZipWithProgress(archive, dest string, progress func(current, total int64)) error {
 	r, err := zip.OpenReader(archive)
 	if err != nil {
@@ -166,17 +235,33 @@ func extractZipWithProgress(archive, dest string, progress func(current, total i
 	}
 	defer r.Close()
 
-	// Count total files for progress tracking
+	// Count files for progress tracking and detect the archive root at once.
 	totalFiles := int64(0)
+	var root rootDirDetector
 	for _, f := range r.File {
+		root.Add(f.Name)
 		if !f.FileInfo().IsDir() {
 			totalFiles++
 		}
 	}
 
+	// JDK archives wrap their contents in one directory (e.g. jdk-17.0.1+12/).
+	// Keep it only when the archive has no single, unambiguous root.
+	rootDir := root.Root()
+
 	var extracted int64
 	for _, f := range r.File {
-		path := filepath.Join(dest, f.Name)
+		name, ok := stripArchiveRoot(normalizeArchiveEntry(f.Name), rootDir)
+		if !ok {
+			// Only the root directory entry has no content; a file named
+			// like the root would silently disappear, so reject it.
+			if f.FileInfo().IsDir() {
+				continue
+			}
+			return fmt.Errorf("invalid file path: %s", f.Name)
+		}
+
+		path := filepath.Join(dest, name)
 
 		// Prevent zip slip vulnerability
 		if !strings.HasPrefix(path, filepath.Clean(dest)+string(os.PathSeparator)) {
@@ -221,54 +306,69 @@ func extractZipWithProgress(archive, dest string, progress func(current, total i
 	return nil
 }
 
-func extractTarGzWithProgress(archive, dest string, progress func(current, total int64)) error {
-	file, err := os.Open(archive)
+// walkTarGz opens a gzip-compressed tarball and visits every entry. The archive
+// is opened per pass because gzip and tar streams cannot be rewound.
+func walkTarGz(archive string, visit func(header *tar.Header, content io.Reader) error) error {
+	f, err := os.Open(archive)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer f.Close()
 
-	tr := tar.NewReader(file)
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		return err
+	}
+	defer gz.Close()
 
-	// First pass: count total files
-	totalFiles := int64(0)
+	tr := tar.NewReader(gz)
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {
-			break
+			return nil
 		}
 		if err != nil {
 			return err
 		}
+		// PAX headers are archive metadata, not content. Global headers are
+		// returned by Reader.Next and must not take part in root detection.
+		if header.Typeflag == tar.TypeXGlobalHeader || header.Typeflag == tar.TypeXHeader {
+			continue
+		}
+		if err := visit(header, tr); err != nil {
+			return err
+		}
+	}
+}
+
+func extractTarGzWithProgress(archive, dest string, progress func(current, total int64)) error {
+	// First pass: count files for progress tracking and detect the archive root.
+	totalFiles := int64(0)
+	var root rootDirDetector
+	if err := walkTarGz(archive, func(header *tar.Header, _ io.Reader) error {
+		root.Add(header.Name)
 		if header.Typeflag == tar.TypeReg {
 			totalFiles++
 		}
-	}
-
-	// Reset reader for second pass
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return nil
+	}); err != nil {
 		return err
 	}
-	// Re-open to reset tar reader
-	file.Close()
-	file, err = os.Open(archive)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	tr = tar.NewReader(file)
 
+	rootDir := root.Root()
+
+	// Second pass: extract entries, stripping the shared root directory.
 	var extracted int64
-	for {
-		header, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
+	return walkTarGz(archive, func(header *tar.Header, content io.Reader) error {
+		name, ok := stripArchiveRoot(normalizeArchiveEntry(header.Name), rootDir)
+		if !ok {
+			if header.Typeflag == tar.TypeDir {
+				return nil
+			}
+			return fmt.Errorf("invalid file path: %s", header.Name)
 		}
 
-		path := filepath.Join(dest, header.Name)
+		path := filepath.Join(dest, name)
 
 		// Prevent tar slip
 		if !strings.HasPrefix(path, filepath.Clean(dest)+string(os.PathSeparator)) {
@@ -277,9 +377,7 @@ func extractTarGzWithProgress(archive, dest string, progress func(current, total
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(path, os.FileMode(header.Mode)); err != nil {
-				return err
-			}
+			return os.MkdirAll(path, os.FileMode(header.Mode))
 		case tar.TypeReg:
 			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 				return err
@@ -289,7 +387,7 @@ func extractTarGzWithProgress(archive, dest string, progress func(current, total
 				return err
 			}
 
-			_, copyErr := io.Copy(outFile, tr)
+			_, copyErr := io.Copy(outFile, content)
 			outFile.Close()
 			if copyErr != nil {
 				return copyErr
@@ -300,7 +398,6 @@ func extractTarGzWithProgress(archive, dest string, progress func(current, total
 				progress(extracted, totalFiles)
 			}
 		}
-	}
-
-	return nil
+		return nil
+	})
 }

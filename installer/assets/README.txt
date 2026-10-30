@@ -8,8 +8,8 @@ System Requirements:
 Installation Notes:
 - The installer will add JDM to your system PATH environment variable
 - JDM_HOME environment variable will be set to the installation directory
-- JDK versions are stored separately from the JDM installation directory
-- You can customize both the JDM installation path and JDK storage path during setup
+- JDK versions are stored in the "versions" subdirectory of the installation directory
+- Only the installation directory can be customized during setup; the JDK storage path follows it
 
 After Installation:
 1. Open a new command prompt or PowerShell window

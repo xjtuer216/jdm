@@ -1,7 +1,7 @@
 # JDM - JDK Version Manager
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.1.1-blue" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows-green" alt="Platform">
   <img src="https://img.shields.io/badge/language-Go-blue" alt="Language">
   <img src="https://img.shields.io/badge/license-MIT-orange" alt="License">
@@ -34,7 +34,7 @@ JDM (JDK Version Manager) 是一个 Windows 平台下的 JDK 版本管理工具�
 
 1. 从 [Gitee Releases](https://gitee.com/xjtuer216/jdm/releases) 或 [GitHub Releases](https://github.com/xjtuer216/jdm/releases) 下载 `jdm-setup-*.exe`
 2. 双击运行安装程序
-3. 选择安装目录和 JDK 存储位置
+3. 选择安装目录（JDK 版本固定存放在其下的 `versions` 子目录）
 4. 安装完成后打开新终端即可使用
 
 ### 方式二：手动安装
@@ -123,9 +123,9 @@ jdm config init
 | `jdm_home` | JDM 主目录 | `~/.jdm` |
 | `jdk_home` | JDK 安装目录 | `~/.jdm/versions` |
 | `mirror` | Adoptium API 镜像 | `https://api.adoptium.net/v3` |
-| `download_mirror` | GitHub 下载代理 | `https://ghproxy.net` |
+| ~~`download_mirror`~~ `proxy` | GitHub 下载代理（`download_mirror` 已弃用，仍作为别名接受并提示） | `https://ghproxy.net` |
 | `default` | 默认 JDK 版本 | (未设置) |
-| `aliases` | 版本别名 | `{}` |
+| `aliases` | 版本别名（只读，使用 `jdm alias` 管理） | `{}` |
 
 ### 自定义镜像源
 
@@ -194,7 +194,7 @@ A: JDM 已内置回退机制。当符号链接创建失败时，会自动使用�
 
 A: 检查网络连接，确保可以访问镜像源。国内用户可以配置下载代理：
 ```powershell
-jdm config set download_mirror https://ghproxy.net
+jdm config set proxy https://ghproxy.net
 ```
 
 ### Q: 切换版本后不生效

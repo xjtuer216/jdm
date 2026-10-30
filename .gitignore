@@ -19,8 +19,8 @@
 .cursor
 .trellis
 .sisyphus
-docs/
-CLAUDE.md
+docs/*
+!docs/agents/
 
 # Installer build outputs
 installer/dist/

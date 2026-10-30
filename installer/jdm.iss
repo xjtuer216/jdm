@@ -7,7 +7,7 @@
 
 #define MyAppName "JDM"
 #ifndef MyAppVersion
-  #define MyAppVersion "1.0.0"
+  #define MyAppVersion "0.1.1"
 #endif
 #define MyAppPublisher "xjtuer216"
 #define MyAppURL "https://github.com/xjtuer216/jdm"
@@ -77,9 +77,6 @@ Name: "chinesesimplified"; MessagesFile: ".\Languages\ChineseSimplified.isl"
 
 [CustomMessages]
 ; English custom messages
-english.JDKStorageTitle=JDK Storage Location
-english.JDKStorageDesc=All downloaded JDK versions will be stored in this directory.
-english.JDKStorageSubCaption=Select the folder where JDK versions should be stored.
 english.AddToPath=Add JDM to system PATH environment variable
 english.CreateDesktopIcon=Create a &desktop shortcut
 english.ConfigGenerated=Configuration file generated based on your selections.
@@ -96,9 +93,6 @@ english.ViewReadme=View README file
 english.AdditionalIcons=Additional icons:
 
 ; Chinese custom messages
-chinesesimplified.JDKStorageTitle=JDK 存储位置
-chinesesimplified.JDKStorageDesc=所有下载的 JDK 版本将存储在此目录中。
-chinesesimplified.JDKStorageSubCaption=选择 JDK 版本的存储文件夹。
 chinesesimplified.AddToPath=将 JDM 添加到系统 PATH 环境变量
 chinesesimplified.CreateDesktopIcon=创建桌面快捷方式(&D)
 chinesesimplified.ConfigGenerated=已根据您的选择自动生成配置文件。
@@ -151,9 +145,6 @@ Type: filesandordirs; Name: "{userappdata}\{#MyAppName}"
 const
   EnvironmentKey = 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment';
   JDMHomeEnvName = 'JDM_HOME';
-
-var
-  JDKStoragePage: TInputDirWizardPage;
 
 { ============================================================================ }
 { PATH Management Functions                                                    }
@@ -309,52 +300,91 @@ begin
 end;
 
 { ============================================================================ }
-{ Wizard Page Initialization                                                   }
+{ Path Helpers                                                                 }
 { ============================================================================ }
 
-procedure InitializeWizard;
-var
-  DefaultJDKPath: string;
+{ 追加子目录：基础目录已以反斜杠结尾时不再重复添加分隔符 }
+function AppendSubDir(const BaseDir, SubDir: string): string;
 begin
-  DefaultJDKPath := ExpandConstant('{userappdata}\{#MyAppName}\versions');
-  JDKStoragePage := CreateInputDirPage(wpSelectDir,
-    ExpandConstant('{cm:JDKStorageTitle}'),
-    ExpandConstant('{cm:JDKStorageDesc}'),
-    ExpandConstant('{cm:JDKStorageSubCaption}'),
-    False, '');
-  JDKStoragePage.Add('');
-  JDKStoragePage.Values[0] := DefaultJDKPath;
+  Result := BaseDir;
+  if (Length(Result) > 0) and (Result[Length(Result)] = '\') then
+    Result := Result + SubDir
+  else
+    Result := Result + '\' + SubDir;
+end;
+
+{ JDK 版本目录固定为 JDM 主目录下的 versions 子目录，
+  与 Go 端 config.NewConfig 的默认值保持一致 }
+function GetJDKHomePath(const JDMHomePath: string): string;
+begin
+  Result := AppendSubDir(JDMHomePath, 'versions');
 end;
 
 { ============================================================================ }
 { Configuration File Generation                                                }
 { ============================================================================ }
 
+{ JsonEscape 将文本转义为合法的 JSON 字符串内容（不含外围双引号） }
+{ Windows 路径中的反斜杠必须转义，否则 JDM 无法解析生成的配置文件 }
+function JsonEscape(const S: string): string;
+var
+  I: Integer;
+  C: Char;
+  Code: Integer;
+  HexDigits: string;
+begin
+  HexDigits := '0123456789abcdef';
+  Result := '';
+  for I := 1 to Length(S) do
+  begin
+    C := S[I];
+    if C = '\' then
+      Result := Result + '\\'
+    else if C = '"' then
+      Result := Result + '\"'
+    else if C = #13 then
+      Result := Result + '\r'
+    else if C = #10 then
+      Result := Result + '\n'
+    else if C = #9 then
+      Result := Result + '\t'
+    else if Ord(C) < 32 then
+    begin
+      Code := Ord(C);
+      Result := Result + '\u00' + HexDigits[(Code div 16) + 1] + HexDigits[(Code mod 16) + 1];
+    end
+    else
+      Result := Result + C;
+  end;
+end;
+
 procedure GenerateConfig;
 var
   ConfigPath: string;
-  ConfigContent: string;
+  ConfigLines: TArrayOfString;
   JDMHomePath: string;
   JDKHomePath: string;
 begin
-  JDMHomePath := WizardForm.DirEdit.Text;
-  JDKHomePath := JDKStoragePage.Values[0];
-  if Length(JDKHomePath) > 0 then
-  begin
-    if JDKHomePath[Length(JDKHomePath)] = '\' then
-      JDKHomePath := Copy(JDKHomePath, 1, Length(JDKHomePath) - 1);
-  end;
-  ConfigContent := '{' + #13#10;
-  ConfigContent := ConfigContent + '  "jdm_home": "' + JDMHomePath + '",' + #13#10;
-  ConfigContent := ConfigContent + '  "jdk_home": "' + JDKHomePath + '",' + #13#10;
-  ConfigContent := ConfigContent + '  "mirror": "https://api.adoptium.net",' + #13#10;
-  ConfigContent := ConfigContent + '  "download_mirror": "https://ghproxy.net",' + #13#10;
-  ConfigContent := ConfigContent + '  "default": "",' + #13#10;
-  ConfigContent := ConfigContent + '  "aliases": {}' + #13#10;
-  ConfigContent := ConfigContent + '}' + #13#10;
+  JDMHomePath := ExpandConstant('{app}');
+  JDKHomePath := GetJDKHomePath(JDMHomePath);
   ConfigPath := JDMHomePath + '\config.json';
   ForceDirectories(JDMHomePath);
-  SaveStringToFile(ConfigPath, ConfigContent, False);
+  SetArrayLength(ConfigLines, 8);
+  ConfigLines[0] := '{';
+  ConfigLines[1] := '  "jdm_home": "' + JsonEscape(JDMHomePath) + '",';
+  ConfigLines[2] := '  "jdk_home": "' + JsonEscape(JDKHomePath) + '",';
+  ConfigLines[3] := '  "mirror": "https://api.adoptium.net",';
+  ConfigLines[4] := '  "proxy": "https://ghproxy.net",';
+  ConfigLines[5] := '  "default": "",';
+  ConfigLines[6] := '  "aliases": {}';
+  ConfigLines[7] := '}';
+  { 以 UTF-8 无 BOM 写出：SaveStringToFile 按系统 ANSI 代码页写入，
+    中文路径会被写成 GBK 字节，JDM 同样无法解析 }
+  if not SaveStringsToUTF8FileWithoutBOM(ConfigPath, ConfigLines, False) then
+  begin
+    Log('[JDM] Failed to write config: ' + ConfigPath);
+    Exit;
+  end;
   Log('[JDM] Generated config at: ' + ConfigPath);
 end;
 
@@ -371,8 +401,9 @@ begin
   if CurStep = ssPostInstall then
   begin
     AppPath := ExpandConstant('{app}');
-    JDKHomePath := JDKStoragePage.Values[0];
-    CurrentBinPath := JDKHomePath + '\current\bin';
+    JDKHomePath := GetJDKHomePath(AppPath);
+    { Go 端把 current 链接创建在 JDM 主目录下，而不是 jdk_home 下 }
+    CurrentBinPath := AppendSubDir(AppPath, 'current') + '\bin';
     Log('[JDM] Post-install: AppPath=' + AppPath + ', JDKHome=' + JDKHomePath);
     GenerateConfig;
     SetJDMHome(AppPath);
@@ -385,6 +416,43 @@ end;
 { ============================================================================ }
 { Uninstall Events                                                             }
 { ============================================================================ }
+
+{ 安装时写入的 JDM_HOME 才是实际主目录；旧版本缺失时回退到安装目录 }
+function GetInstalledJDMHome: string;
+var
+  Value: string;
+begin
+  Result := '';
+  if RegQueryStringValue(HKEY_CURRENT_USER, 'Environment', JDMHomeEnvName, Value) then
+    Result := Value
+  else if RegQueryStringValue(HKEY_LOCAL_MACHINE, EnvironmentKey, JDMHomeEnvName, Value) then
+    Result := Value;
+  if Result = '' then
+    Result := ExpandConstant('{app}');
+end;
+
+{ 删除 current 链接本身。RemoveDir 直接调用 RemoveDirectory，
+  对目录符号链接/联接点只移除链接，不会删除链接指向的 JDK 目录 }
+procedure RemoveCurrentLink(const JDMHomePath: string);
+var
+  CurrentPath: string;
+begin
+  CurrentPath := AppendSubDir(JDMHomePath, 'current');
+  if DirExists(CurrentPath) then
+  begin
+    if RemoveDir(CurrentPath) then
+      Log('[JDM] Removed current link: ' + CurrentPath)
+    else
+      Log('[JDM] Failed to remove current link: ' + CurrentPath);
+  end
+  else if FileExists(CurrentPath) then
+  begin
+    if DeleteFile(CurrentPath) then
+      Log('[JDM] Removed current file link: ' + CurrentPath)
+    else
+      Log('[JDM] Failed to remove current file link: ' + CurrentPath);
+  end;
+end;
 
 function InitializeUninstall(): Boolean;
 begin
@@ -401,21 +469,37 @@ end;
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   AppPath: string;
+  JDMHomePath: string;
   JDKHomePath: string;
   CurrentBinPath: string;
+  LegacyCurrentBinPath: string;
+  LegacyDefaultBinPath: string;
 begin
   case CurUninstallStep of
     usUninstall:
       begin
         Log('[JDM] Starting uninstall cleanup...');
         AppPath := ExpandConstant('{app}');
-        JDKHomePath := ExpandConstant('{userappdata}\{#MyAppName}\versions');
-        CurrentBinPath := JDKHomePath + '\current\bin';
+        JDMHomePath := GetInstalledJDMHome;
+        JDKHomePath := GetJDKHomePath(JDMHomePath);
+        CurrentBinPath := AppendSubDir(JDMHomePath, 'current') + '\bin';
+        { 旧版安装器把 PATH 指向所选 jdk_home\current\bin，默认 jdk_home 在 userappdata 下 }
+        LegacyCurrentBinPath := AppendSubDir(JDKHomePath, 'current') + '\bin';
+        LegacyDefaultBinPath :=
+            ExpandConstant('{userappdata}\{#MyAppName}\versions\current\bin');
+        Log('[JDM] Uninstall: AppPath=' + AppPath + ', JDMHome=' + JDMHomePath +
+            ', JDKHome=' + JDKHomePath);
+        RemoveCurrentLink(JDMHomePath);
+        RemoveCurrentLink(JDKHomePath);
         RemoveJDMHome;
         RemoveFromSystemPath(AppPath);
         RemoveFromSystemPath(CurrentBinPath);
+        RemoveFromSystemPath(LegacyCurrentBinPath);
+        RemoveFromSystemPath(LegacyDefaultBinPath);
         RemoveFromUserPath(AppPath);
         RemoveFromUserPath(CurrentBinPath);
+        RemoveFromUserPath(LegacyCurrentBinPath);
+        RemoveFromUserPath(LegacyDefaultBinPath);
         Log('[JDM] Environment cleanup completed');
       end;
     usPostUninstall:

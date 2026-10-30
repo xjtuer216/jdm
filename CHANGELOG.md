@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-30
+
+### Fixed
+
+- `jdm config set download_mirror` 现在写入 `proxy` 并提示旧名称已弃用，修复命令提示成功但配置文件未更新的问题 (IKE2JB)
+- 加载旧版配置时把 `download_mirror` 视为 `proxy`，升级用户已有的自定义代理继续生效，保存后写回规范键
+- `jdm config get aliases` 和 `jdm config list` 现在显示版本别名；`jdm config set aliases` 提示改用 `jdm alias set/del`
+- `jdm config set` 遇到未知配置项时直接报错并列出可写配置项，不再静默成功
+- 安装程序不再单独选择 JDK 存储位置，`jdk_home` 固定为安装目录下的 `versions`，修复 `jdm ls` 把目录名当作版本号 (IKE2IU)
+- 安装程序把 `<JDM_HOME>\current\bin` 写入 PATH，此前误写为 `versions\current\bin`
+- 卸载时从 `JDM_HOME` 读取实际安装路径，并删除残留的 `current` 链接与 PATH 项 (IKE2IP)
+- 升级安装后 JDK 版本目录统一为 `<安装目录>\versions`，旧版默认目录 `%APPDATA%\JDM\versions` 中的版本不再被识别
+- 解压 JDK 归档时剥离自带的单一根目录，避免安装后多出一层版本目录
+- 修复 `.tar.gz` 归档未被 gzip 解压的问题
+
 ---
 
 ## [0.1.0] - 2026-04-18
@@ -100,5 +115,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **构建**: `go build -ldflags "-X github.com/xjtuer216/jdm/internal/jdk.Version=X.Y.Z"`
 - **ZIP 解压防逃逸**（Zip Slip 保护）
 
-[Unreleased]: https://github.com/xjtuer216/jdm/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/xjtuer216/jdm/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/xjtuer216/jdm/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/xjtuer216/jdm/releases/tag/v0.1.0

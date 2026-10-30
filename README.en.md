@@ -1,7 +1,7 @@
 # JDM - JDK Version Manager
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.1.1-blue" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows-green" alt="Platform">
   <img src="https://img.shields.io/badge/language-Go-blue" alt="Language">
   <img src="https://img.shields.io/badge/license-MIT-orange" alt="License">
@@ -34,7 +34,7 @@ JDM (JDK Version Manager) is a JDK version management tool for Windows, similar 
 
 1. Download `jdm-setup-*.exe` from [Gitee Releases](https://gitee.com/xjtuer216/jdm/releases) or [GitHub Releases](https://github.com/xjtuer216/jdm/releases)
 2. Double-click to run the installer
-3. Choose the installation directory and JDK storage location
+3. Choose the installation directory (JDK versions are stored in its `versions` subdirectory)
 4. Open a new terminal after installation to start using JDM
 
 ### Method 2: Manual Installation
@@ -123,9 +123,9 @@ jdm config init
 | `jdm_home` | JDM main directory | `~/.jdm` |
 | `jdk_home` | JDK installation directory | `~/.jdm/versions` |
 | `mirror` | Adoptium API mirror | `https://api.adoptium.net/v3` |
-| `download_mirror` | GitHub download proxy | `https://ghproxy.net` |
+| ~~`download_mirror`~~ → `proxy` | GitHub download proxy (`download_mirror` is deprecated but still accepted as an alias) | `https://ghproxy.net` |
 | `default` | Default JDK version | (not set) |
-| `aliases` | Version aliases | `{}` |
+| `aliases` | Version aliases (read-only; manage with `jdm alias`) | `{}` |
 
 ### Custom Mirror Sources
 
@@ -194,7 +194,7 @@ A: JDM has a built-in fallback mechanism. When symlink creation fails, it automa
 
 A: Check your network connection and ensure the mirror source is accessible. Users in China can configure a download proxy:
 ```powershell
-jdm config set download_mirror https://ghproxy.net
+jdm config set proxy https://ghproxy.net
 ```
 
 ### Q: Version switch doesn't take effect

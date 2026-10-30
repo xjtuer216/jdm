@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/xjtuer216/jdm/internal/config"
 )
 
 var configCmd = &cobra.Command{
@@ -24,10 +25,22 @@ var configGetCmd = &cobra.Command{
 	Use:   "get <key>",
 	Short: "Get a configuration value",
 	Args:  cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return config.ReadableKeys(), cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := getConfig()
-		key := args[0]
-		value := cfg.Get(key)
+		warnDeprecated(args[0])
+		key := config.CanonicalKey(args[0])
+
+		value, err := cfg.Get(key)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 		if value == "" {
 			fmt.Printf("Key '%s' not found\n", key)
 			os.Exit(1)
@@ -40,9 +53,16 @@ var configSetCmd = &cobra.Command{
 	Use:   "set <key> <value>",
 	Short: "Set a configuration value",
 	Args:  cobra.ExactArgs(2),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			return config.SettableKeys(), cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := getConfig()
-		key := args[0]
+		warnDeprecated(args[0])
+		key := config.CanonicalKey(args[0])
 		value := args[1]
 
 		if err := cfg.Set(key, value); err != nil {
@@ -54,12 +74,24 @@ var configSetCmd = &cobra.Command{
 	},
 }
 
+// warnDeprecated 在使用已弃用的配置项名称时输出提示
+func warnDeprecated(key string) {
+	if !config.IsDeprecatedKey(key) {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "Warning: '%s' is deprecated, use '%s' instead\n", key, config.CanonicalKey(key))
+}
+
 var configListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all configuration values",
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := getConfig()
-		all := cfg.GetAll()
+		all, err := cfg.GetAll()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 
 		fmt.Println("Current configuration:")
 		for key, value := range all {
@@ -98,12 +130,4 @@ func init() {
 	configCmd.AddCommand(configSetCmd)
 	configCmd.AddCommand(configListCmd)
 	configCmd.AddCommand(configInitCmd)
-
-	// 注册配置项补全
-	_ = configGetCmd.RegisterFlagCompletionFunc("key", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"jdm_home", "jdk_home", "mirror", "default"}, cobra.ShellCompDirectiveNoFileComp
-	})
-	_ = configSetCmd.RegisterFlagCompletionFunc("key", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"jdm_home", "jdk_home", "mirror", "default"}, cobra.ShellCompDirectiveNoFileComp
-	})
 }

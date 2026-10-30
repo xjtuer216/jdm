@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -42,6 +43,13 @@ func getConfig() *config.Config {
 		Cfg = config.NewConfig(jdmHome)
 		if err := Cfg.Load(); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: Failed to load config: %v\n", err)
+			var cfgErr *config.ConfigError
+			if errors.As(err, &cfgErr) {
+				fmt.Fprintf(os.Stderr, "Hint: %s\n", cfgErr.Hint())
+			} else {
+				// Load 的其余错误只来自目录创建，与配置文件内容无关
+				fmt.Fprintf(os.Stderr, "Hint: check that the JDM home and JDK home directories exist and are writable\n")
+			}
 		}
 	}
 	return Cfg

@@ -19,7 +19,7 @@ echo.
 
 :: Get version from argument or default
 if "%~1"=="" (
-    set "VERSION=1.0.0"
+    set "VERSION=0.1.1"
 ) else (
     set "VERSION=%~1"
 )

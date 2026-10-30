@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-30
+
 ### Fixed
 
 - `jdm config set download_mirror` 现在写入 `proxy` 并提示旧名称已弃用，修复命令提示成功但配置文件未更新的问题 (IKE2JB)
@@ -113,5 +115,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **构建**: `go build -ldflags "-X github.com/xjtuer216/jdm/internal/jdk.Version=X.Y.Z"`
 - **ZIP 解压防逃逸**（Zip Slip 保护）
 
-[Unreleased]: https://github.com/xjtuer216/jdm/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/xjtuer216/jdm/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/xjtuer216/jdm/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/xjtuer216/jdm/releases/tag/v0.1.0

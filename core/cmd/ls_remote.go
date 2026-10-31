@@ -15,7 +15,7 @@ var lsRemoteCmd = &cobra.Command{
 	Short: "List available JDK versions from remote",
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		vm := jdk.NewVersionManager(Cfg)
+		vm := jdk.NewVersionManager(getConfig())
 
 		var version string
 		if len(args) > 0 {

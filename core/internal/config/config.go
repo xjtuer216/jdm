@@ -125,15 +125,13 @@ func (c *Config) GetConfigPath() string {
 	return filepath.Join(c.JDMHome, ConfigFileName)
 }
 
-// GetInstallConfigPath 获取安装目录配置文件的路径
-func (c *Config) GetInstallConfigPath() string {
-	// 获取 exe 所在的目录
+// InstallConfigPath 返回安装目录配置文件的路径，无法定位 exe 时返回空字符串
+func InstallConfigPath() string {
 	exePath, err := os.Executable()
 	if err != nil {
 		return ""
 	}
-	exeDir := filepath.Dir(exePath)
-	return filepath.Join(exeDir, ConfigFileName)
+	return filepath.Join(filepath.Dir(exePath), ConfigFileName)
 }
 
 // NewConfig 创建一个新的 Config 实例
@@ -173,7 +171,7 @@ func (c *Config) Load() error {
 
 	// 用户配置不存在，尝试加载安装目录配置
 	var loadErr error
-	installConfigPath := c.GetInstallConfigPath()
+	installConfigPath := InstallConfigPath()
 	if installConfigPath != "" {
 		data, err := os.ReadFile(installConfigPath)
 		if err == nil {
@@ -253,30 +251,6 @@ func (c *Config) Save() error {
 	}
 
 	return os.WriteFile(c.GetConfigPath(), data, 0644)
-}
-
-// SaveToInstallDir 保存配置到安装目录（用于初始化安装目录的配置模板）
-func (c *Config) SaveToInstallDir() error {
-	installConfigPath := c.GetInstallConfigPath()
-	if installConfigPath == "" {
-		return nil
-	}
-
-	// 只保存必要的配置项到安装目录
-	installConfig := map[string]string{
-		"jdm_home":   c.JDMHome,
-		"jdk_home":   c.JDKHome,
-		"mirror":     c.Mirror,
-		"jdk_mirror": c.JDKMirror,
-		"proxy":      c.Proxy,
-	}
-
-	data, err := json.MarshalIndent(installConfig, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(installConfigPath, data, 0644)
 }
 
 func (c *Config) ensureDirectories() error {

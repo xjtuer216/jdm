@@ -321,71 +321,32 @@ begin
 end;
 
 { ============================================================================ }
-{ Configuration File Generation                                                }
+{ Configuration File Initialization                                           }
 { ============================================================================ }
 
-{ JsonEscape 将文本转义为合法的 JSON 字符串内容（不含外围双引号） }
-{ Windows 路径中的反斜杠必须转义，否则 JDM 无法解析生成的配置文件 }
-function JsonEscape(const S: string): string;
+{ 配置默认值只由 JDM 自身维护，安装器不再重复生成 JSON：
+  config init --install 会在配置不存在时写入完整模板，
+  已存在时只补充缺失的键，保留用户自定义值 }
+procedure InitializeInstallConfig;
 var
-  I: Integer;
-  C: Char;
-  Code: Integer;
-  HexDigits: string;
-begin
-  HexDigits := '0123456789abcdef';
-  Result := '';
-  for I := 1 to Length(S) do
-  begin
-    C := S[I];
-    if C = '\' then
-      Result := Result + '\\'
-    else if C = '"' then
-      Result := Result + '\"'
-    else if C = #13 then
-      Result := Result + '\r'
-    else if C = #10 then
-      Result := Result + '\n'
-    else if C = #9 then
-      Result := Result + '\t'
-    else if Ord(C) < 32 then
-    begin
-      Code := Ord(C);
-      Result := Result + '\u00' + HexDigits[(Code div 16) + 1] + HexDigits[(Code mod 16) + 1];
-    end
-    else
-      Result := Result + C;
-  end;
-end;
-
-procedure GenerateConfig;
-var
+  AppPath: string;
   ConfigPath: string;
-  ConfigLines: TArrayOfString;
-  JDMHomePath: string;
-  JDKHomePath: string;
+  ResultCode: Integer;
 begin
-  JDMHomePath := ExpandConstant('{app}');
-  JDKHomePath := GetJDKHomePath(JDMHomePath);
-  ConfigPath := JDMHomePath + '\config.json';
-  ForceDirectories(JDMHomePath);
-  SetArrayLength(ConfigLines, 8);
-  ConfigLines[0] := '{';
-  ConfigLines[1] := '  "jdm_home": "' + JsonEscape(JDMHomePath) + '",';
-  ConfigLines[2] := '  "jdk_home": "' + JsonEscape(JDKHomePath) + '",';
-  ConfigLines[3] := '  "mirror": "https://api.adoptium.net",';
-  ConfigLines[4] := '  "proxy": "https://ghproxy.net",';
-  ConfigLines[5] := '  "default": "",';
-  ConfigLines[6] := '  "aliases": {}';
-  ConfigLines[7] := '}';
-  { 以 UTF-8 无 BOM 写出：SaveStringToFile 按系统 ANSI 代码页写入，
-    中文路径会被写成 GBK 字节，JDM 同样无法解析 }
-  if not SaveStringsToUTF8FileWithoutBOM(ConfigPath, ConfigLines, False) then
+  AppPath := ExpandConstant('{app}');
+  ConfigPath := AppPath + '\config.json';
+  if not Exec(AppPath + '\{#MyAppExeName}', 'config init --install', AppPath,
+      SW_HIDE, ewWaitUntilTerminated, ResultCode) then
   begin
-    Log('[JDM] Failed to write config: ' + ConfigPath);
+    Log('[JDM] Failed to launch config init: ' + AppPath);
     Exit;
   end;
-  Log('[JDM] Generated config at: ' + ConfigPath);
+  if ResultCode <> 0 then
+  begin
+    Log('[JDM] config init failed with exit code ' + IntToStr(ResultCode));
+    Exit;
+  end;
+  Log('[JDM] Initialized config at: ' + ConfigPath);
 end;
 
 { ============================================================================ }
@@ -405,7 +366,7 @@ begin
     { Go 端把 current 链接创建在 JDM 主目录下，而不是 jdk_home 下 }
     CurrentBinPath := AppendSubDir(AppPath, 'current') + '\bin';
     Log('[JDM] Post-install: AppPath=' + AppPath + ', JDKHome=' + JDKHomePath);
-    GenerateConfig;
+    InitializeInstallConfig;
     SetJDMHome(AppPath);
     AddToSystemPath(AppPath);
     AddToSystemPath(CurrentBinPath);

@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- 安装/升级不再覆盖安装目录配置：只补充缺失键，新装写入默认 `jdk_mirror` 下载源 (IKRV51)
 - README 中 `mirror` 默认值误写为 `https://api.adoptium.net/v3`，修正为 `https://api.adoptium.net`
 - README 移除实测 404 的阿里云 Adoptium 示例
 

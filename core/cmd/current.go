@@ -12,7 +12,7 @@ var currentCmd = &cobra.Command{
 	Use:   "current",
 	Short: "Show the currently active JDK version",
 	Run: func(cmd *cobra.Command, args []string) {
-		vm := jdk.NewVersionManager(Cfg)
+		vm := jdk.NewVersionManager(getConfig())
 		current, err := vm.GetCurrent()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)

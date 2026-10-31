@@ -51,14 +51,14 @@ func getConfig() *config.Config {
 				fmt.Fprintf(os.Stderr, "Hint: check that the JDM home and JDK home directories exist and are writable\n")
 			}
 		}
+		// 配置加载后才初始化日志；不需要配置的命令不创建用户目录
+		initLogging()
 	}
 	return Cfg
 }
 
 // Execute runs the root command
 func Execute() error {
-	// Initialize config
-	Cfg = getConfig()
 	return rootCmd.Execute()
 }
 
@@ -108,9 +108,6 @@ For more information about each command, run 'jdm <command> --help'`,
 
 	// Add log file flag
 	rootCmd.PersistentFlags().StringVar(&logFile, "log", "", "log file path")
-
-	// Set up PersistentPreRun to initialize logging
-	cobra.OnInitialize(initLogging)
 }
 
 func initLogging() {

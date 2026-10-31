@@ -38,7 +38,7 @@ core/
 - **Package naming**: Single word, lowercase (`config`, `jdk`, `web`)
 - **Error handling**: Return errors, don't panic
 - **Tests**: `*_test.go` alongside source, standard library `testing` (testify is not a dependency); HTTP tests use `httptest`
-- **Config keys**: a scalar key must be registered in `NewConfig`, `settableKeys`, `scalarField`, `SaveToInstallDir`, install-config merge, and `config.json`
+- **Config keys**: a scalar key must be registered in `NewConfig`, `settableKeys`, `scalarField`, `EnsureInstallConfig`, install-config merge, and `config.json`
 - **HTTP**: every request carries `User-Agent: JDM/<version>`
 - **Version injection**: `-ldflags "-X github.com/xjtuer216/jdm/internal/jdk.Version=X.Y.Z"`
 

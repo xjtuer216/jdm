@@ -24,8 +24,8 @@ Reviewer-facing judgement calls. Mechanical checks live in `scripts/check.sh`,
 ## Configuration
 
 - A new scalar key touches all of: the `NewConfig` default, `settableKeys`,
-  `scalarField`, `SaveToInstallDir`, the install-config merge, `core/config.json`,
-  and the README tables.
+  `scalarField`, `EnsureInstallConfig`, the install-config merge,
+  `core/config.json`, and the README tables.
 - Store `none` verbatim; treat it as disabled only when reading the effective
   value. `jdk_mirror` and `proxy` share this convention.
 

@@ -27,6 +27,7 @@ JDM (JDK Version Manager) 是一个 Windows 平台下的 JDK 版本管理工具�
 - **免管理员** - 符号链接失败时自动回退到目录联接（Junction），无需管理员权限
 - **配置灵活** - 支持自定义镜像源、安装目录和双层配置
 - **图形安装** - 提供 Inno Setup 安装向导，支持中英文界面
+- **自升级** - 任意命令后台探测新版本（24 小时冷却），`jdm update` 一键升级自身
 
 ## 安装方式
 
@@ -76,7 +77,24 @@ jdm current
 
 # 卸载 JDK
 jdm uninstall 17
+
+# 升级 JDM 自身
+jdm update
 ```
+
+### 自升级
+
+JDM 会随命令执行在后台探测新版本（24 小时内不重复探测），发现新版本时在命令输出末尾提示；无新版本或无网络时零输出、零感知。
+
+```powershell
+# 检查并升级 JDM 到最新版本（不受冷却期限制）
+jdm update
+
+# 确认升级生效（重启 jdm 后显示新版本）
+jdm -v
+```
+
+升级下载按候选链进行（Gitee 优先、GitHub 回退），经 SHA-256 校验（release 附带的 `checksums.txt`）通过后才替换程序，失败不影响现有版本。
 
 ### 别名管理
 
@@ -217,6 +235,7 @@ $env:PATH = "$env:USERPROFILE\.jdm\current\bin;$env:PATH"
 | `jdm config get <key>` | 获取配置值 |
 | `jdm config set <key> <value>` | 设置配置值 |
 | `jdm config init` | 初始化配置文件 |
+| `jdm update` | 检查并升级 JDM 自身 |
 | `jdm current` | 查看当前版本 |
 | `jdm version` | 查看 JDM 版本 |
 | `jdm help` | 查看帮助 |
@@ -305,6 +324,7 @@ jdm/
 │       ├── log/             # 日志
 │       ├── progress/        # 进度条
 │       ├── semver/          # 语义化版本解析
+│       ├── selfupdate/      # 自升级（版本探测与替换）
 │       └── web/             # Adoptium API 客户端
 ├── installer/               # Inno Setup 安装程序
 │   ├── jdm.iss              # 安装脚本

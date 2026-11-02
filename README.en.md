@@ -27,6 +27,7 @@ JDM (JDK Version Manager) is a JDK version management tool for Windows, similar 
 - **No Admin Required** - Automatic fallback to Directory Junction when symlinks fail, no administrator privileges needed
 - **Flexible Configuration** - Custom mirror sources, installation directories, and dual-layer config
 - **Graphical Installer** - Inno Setup wizard with bilingual (English/Chinese) interface
+- **Self-Update** - Background version check on every command (24-hour cooldown), upgrade itself with `jdm update`
 
 ## Installation
 
@@ -76,7 +77,24 @@ jdm current
 
 # Uninstall JDK
 jdm uninstall 17
+
+# Upgrade JDM itself
+jdm update
 ```
+
+### Self-Update
+
+JDM checks for new versions in the background as commands run (no more than once every 24 hours) and appends an upgrade notice to the command output; it stays silent when there is no update or no network.
+
+```powershell
+# Check for and install the latest JDM version (bypasses the cooldown)
+jdm update
+
+# Confirm the upgrade took effect (restart jdm to see the new version)
+jdm -v
+```
+
+The upgrade download follows a candidate chain (Gitee first, GitHub fallback) and only replaces the program after SHA-256 verification (using the `checksums.txt` attached to the release); a failed upgrade leaves the existing version untouched.
 
 ### Alias Management
 
@@ -217,6 +235,7 @@ $env:PATH = "$env:USERPROFILE\.jdm\current\bin;$env:PATH"
 | `jdm config get <key>` | Get a configuration value |
 | `jdm config set <key> <value>` | Set a configuration value |
 | `jdm config init` | Initialize configuration file |
+| `jdm update` | Check for and install JDM updates |
 | `jdm current` | View current version |
 | `jdm version` | View JDM version |
 | `jdm help` | View help |
@@ -305,6 +324,7 @@ jdm/
 │       ├── log/             # Logging
 │       ├── progress/        # Progress bars
 │       ├── semver/          # Semantic version parsing
+│       ├── selfupdate/      # Self-update (version check and replacement)
 │       └── web/             # Adoptium API client
 ├── installer/               # Inno Setup installer
 │   ├── jdm.iss              # Installer script

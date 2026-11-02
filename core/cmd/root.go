@@ -28,18 +28,22 @@ var Cfg *config.Config
 // logFile is the path to the log file
 var logFile string
 
+// defaultJDMHome 解析 JDM 主目录：JDM_HOME 环境变量优先，其次用户主目录
+func defaultJDMHome() string {
+	if jdmHome := os.Getenv("JDM_HOME"); jdmHome != "" {
+		return jdmHome
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ".jdm"
+	}
+	return fmt.Sprintf("%s/.jdm", home)
+}
+
 func getConfig() *config.Config {
 	if Cfg == nil {
 		// Use default JDM home from environment or current directory
-		jdmHome := os.Getenv("JDM_HOME")
-		if jdmHome == "" {
-			home, err := os.UserHomeDir()
-			if err != nil {
-				jdmHome = ".jdm"
-			} else {
-				jdmHome = fmt.Sprintf("%s/.jdm", home)
-			}
-		}
+		jdmHome := defaultJDMHome()
 		Cfg = config.NewConfig(jdmHome)
 		if err := Cfg.Load(); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: Failed to load config: %v\n", err)

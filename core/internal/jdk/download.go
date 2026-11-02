@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/xjtuer216/jdm/internal/progress"
@@ -60,6 +61,15 @@ type downloader struct {
 
 func newDownloader(client *http.Client, userAgent string) *downloader {
 	return &downloader{client: client, userAgent: userAgent}
+}
+
+// DownloadBinary 按候选链下载并校验单个文件，返回临时文件路径。
+// 供 selfupdate 复用 JDK 安装的同一下载器（候选链、SHA-256、字节数校验、
+// 失败即删临时文件），不为自升级另写下载器。
+func DownloadBinary(sources []DownloadSource, expectedSize int64, checksum string) (string, error) {
+	d := newDownloader(&http.Client{Timeout: 10 * time.Minute}, UserAgent())
+	path, _, err := d.Download(sources, expectedSize, checksum)
+	return path, err
 }
 
 // downloadAttempt 记录单个来源的失败原因

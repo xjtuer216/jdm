@@ -28,18 +28,22 @@ var Cfg *config.Config
 // logFile is the path to the log file
 var logFile string
 
+// defaultJDMHome 解析 JDM 主目录：JDM_HOME 环境变量优先，其次用户主目录
+func defaultJDMHome() string {
+	if jdmHome := os.Getenv("JDM_HOME"); jdmHome != "" {
+		return jdmHome
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ".jdm"
+	}
+	return fmt.Sprintf("%s/.jdm", home)
+}
+
 func getConfig() *config.Config {
 	if Cfg == nil {
 		// Use default JDM home from environment or current directory
-		jdmHome := os.Getenv("JDM_HOME")
-		if jdmHome == "" {
-			home, err := os.UserHomeDir()
-			if err != nil {
-				jdmHome = ".jdm"
-			} else {
-				jdmHome = fmt.Sprintf("%s/.jdm", home)
-			}
-		}
+		jdmHome := defaultJDMHome()
 		Cfg = config.NewConfig(jdmHome)
 		if err := Cfg.Load(); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: Failed to load config: %v\n", err)
@@ -51,14 +55,14 @@ func getConfig() *config.Config {
 				fmt.Fprintf(os.Stderr, "Hint: check that the JDM home and JDK home directories exist and are writable\n")
 			}
 		}
+		// 配置加载后才初始化日志；不需要配置的命令不创建用户目录
+		initLogging()
 	}
 	return Cfg
 }
 
 // Execute runs the root command
 func Execute() error {
-	// Initialize config
-	Cfg = getConfig()
 	return rootCmd.Execute()
 }
 
@@ -92,7 +96,8 @@ EXAMPLES:
   jdm use 17                  # Switch to JDK 17
   jdm default 17              # Set JDK 17 as default
   jdm alias set myjdk 17.0.2  # Create an alias for a version
-  jdm config set mirror <url> # Set custom download mirror
+  jdm config set jdk_mirror <url> # Set JDK download source (none disables)
+  jdm config set mirror <url>     # Set Adoptium API base URL
 
 GETTING STARTED:
   1. Run 'jdm install <version>' to install a JDK version
@@ -107,9 +112,6 @@ For more information about each command, run 'jdm <command> --help'`,
 
 	// Add log file flag
 	rootCmd.PersistentFlags().StringVar(&logFile, "log", "", "log file path")
-
-	// Set up PersistentPreRun to initialize logging
-	cobra.OnInitialize(initLogging)
 }
 
 func initLogging() {

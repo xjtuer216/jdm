@@ -19,6 +19,12 @@ func GetVersion() string {
 	return Version
 }
 
+// UserAgent 返回所有 HTTP 请求使用的 User-Agent
+// 部分镜像站会拒绝 Go 默认的 User-Agent
+func UserAgent() string {
+	return "JDM/" + Version
+}
+
 // GetBuildTime 获取构建时间
 func GetBuildTime() string {
 	if BuildTime == "unknown" {

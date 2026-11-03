@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+# Guardrail: enforce branch prefixes and run the shared check before pushing.
+set -eu
+
+branch=$(git symbolic-ref --short HEAD 2>/dev/null || true)
+case "$branch" in
+  ""|develop|master|main|feat/*|fix/*|chore/*|docs/*|test/*|refactor/*|release/*) ;;
+  *)
+    printf "Branch '%s' is not allowed. Use feat/, fix/, chore/, docs/, test/, refactor/, or release/.\n" "$branch" >&2
+    exit 1
+    ;;
+esac
+
+exec "$(dirname "$0")/../scripts/check.sh"

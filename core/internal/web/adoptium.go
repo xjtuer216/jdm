@@ -43,6 +43,7 @@ type RemoteVersion struct {
 	DownloadURL string `json:"download_url"`
 	FileName    string `json:"file_name"`
 	FileSize    int64  `json:"file_size"`
+	Checksum    string `json:"checksum"`
 	IsLTS       bool   `json:"is_lts"`
 }
 
@@ -64,30 +65,46 @@ type AdoptiumBinary struct {
 	Architecture string `json:"architecture"`
 	OS           string `json:"os"`
 	Package      struct {
-		Link string `json:"link"`
-		Name string `json:"name"`
-		Size int64  `json:"size"`
+		Link     string `json:"link"`
+		Name     string `json:"name"`
+		Size     int64  `json:"size"`
+		Checksum string `json:"checksum"`
 	} `json:"package"`
 }
 
 type AdoptiumClient struct {
-	Mirror string
-	Client *http.Client
+	Mirror    string
+	Client    *http.Client
+	UserAgent string
 }
 
-func NewAdoptiumClient(mirror string) *AdoptiumClient {
+func NewAdoptiumClient(mirror, userAgent string) *AdoptiumClient {
 	return &AdoptiumClient{
-		Mirror: mirror,
+		Mirror:    mirror,
+		UserAgent: userAgent,
 		Client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
 	}
 }
 
+// get 发送携带 JDM User-Agent 的 GET 请求
+// 部分镜像站会拒绝 Go 默认的 User-Agent
+func (c *AdoptiumClient) get(url string) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	if c.UserAgent != "" {
+		req.Header.Set("User-Agent", c.UserAgent)
+	}
+	return c.Client.Do(req)
+}
+
 func (c *AdoptiumClient) FetchVersions(javaVersion int) ([]RemoteVersion, error) {
 	url := fmt.Sprintf("%s/v3/assets/feature_releases/%d/ga?image_type=jdk&os=windows&architecture=x64", c.Mirror, javaVersion)
 
-	resp, err := c.Client.Get(url)
+	resp, err := c.get(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch versions: %w", err)
 	}
@@ -129,6 +146,7 @@ func (c *AdoptiumClient) FetchVersions(javaVersion int) ([]RemoteVersion, error)
 				DownloadURL: binary.Package.Link,
 				FileName:    binary.Package.Name,
 				FileSize:    binary.Package.Size,
+				Checksum:    binary.Package.Checksum,
 				IsLTS:       isLTSVersion,
 			})
 		}
@@ -192,7 +210,7 @@ type AvailableReleases struct {
 func (c *AdoptiumClient) ListAvailableReleases() ([]int, []int, int, int, error) {
 	url := fmt.Sprintf("%s/v3/info/available_releases", c.Mirror)
 
-	resp, err := c.Client.Get(url)
+	resp, err := c.get(url)
 	if err != nil {
 		return nil, nil, 0, 0, fmt.Errorf("failed to fetch available releases: %w", err)
 	}

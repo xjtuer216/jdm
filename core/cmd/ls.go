@@ -12,7 +12,7 @@ var lsCmd = &cobra.Command{
 	Use:   "ls",
 	Short: "List locally installed JDK versions",
 	Run: func(cmd *cobra.Command, args []string) {
-		vm := jdk.NewVersionManager(Cfg)
+		vm := jdk.NewVersionManager(getConfig())
 		versions, err := vm.ListLocal()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)

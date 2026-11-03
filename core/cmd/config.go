@@ -103,18 +103,39 @@ var configListCmd = &cobra.Command{
 
 		// 显示配置文件的路径
 		fmt.Printf("\nUser config: %s\n", cfg.GetConfigPath())
-		if installPath := cfg.GetInstallConfigPath(); installPath != "" {
+		if installPath := config.InstallConfigPath(); installPath != "" {
 			fmt.Printf("Install config: %s\n", installPath)
 		}
 	},
 }
 
+var configInitInstall bool
+
 var configInitCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize configuration file",
 	Long: `Create a default configuration file.
-This will create config.json in the user directory (~/.jdm/config.json).`,
+This will create config.json in the user directory (~/.jdm/config.json).
+
+With --install, initialize the install-directory config template instead:
+missing keys are filled with defaults, existing values are kept.
+The Windows installer uses this flag.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		if configInitInstall {
+			// 不加载用户配置：安装目录模板的默认值以 exe 所在目录为准
+			installPath := config.InstallConfigPath()
+			if installPath == "" {
+				fmt.Fprintln(os.Stderr, "Error: cannot locate the install directory")
+				os.Exit(1)
+			}
+			if err := config.EnsureInstallConfig(installPath); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Printf("Install config initialized at: %s\n", installPath)
+			return
+		}
+
 		cfg := getConfig()
 		if err := cfg.Save(); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -130,4 +151,5 @@ func init() {
 	configCmd.AddCommand(configSetCmd)
 	configCmd.AddCommand(configListCmd)
 	configCmd.AddCommand(configInitCmd)
+	configInitCmd.Flags().BoolVar(&configInitInstall, "install", false, "initialize the install-directory config template")
 }

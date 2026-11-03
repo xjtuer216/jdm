@@ -1,0 +1,22 @@
+name: check
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    # JDM is a Windows-only tool: run the guardrail on the target OS.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: core/go.mod
+          cache: true
+          cache-dependency-path: core/go.sum
+      - run: ./scripts/check.sh
+        shell: bash

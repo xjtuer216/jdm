@@ -3,7 +3,6 @@ package jdk
 import (
 	"archive/zip"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -32,7 +31,7 @@ type VersionManager struct {
 func NewVersionManager(cfg *config.Config) *VersionManager {
 	return &VersionManager{
 		Config: cfg,
-		Client: web.NewAdoptiumClient(cfg.Mirror),
+		Client: web.NewAdoptiumClient(cfg.Mirror, UserAgent()),
 	}
 }
 
@@ -132,27 +131,33 @@ func (vm *VersionManager) Install(version string) error {
 		return fmt.Errorf("failed to fetch versions: %w", err)
 	}
 
-	var downloadURL string
-	var fileSize int64
-
-	for _, v := range remoteVersions {
-		if v.Version == resolvedVersion {
-			downloadURL = v.DownloadURL
-			fileSize = v.FileSize
+	var target *web.RemoteVersion
+	for i := range remoteVersions {
+		if remoteVersions[i].Version == resolvedVersion {
+			target = &remoteVersions[i]
 			break
 		}
 	}
 
-	if downloadURL == "" {
+	if target == nil || target.DownloadURL == "" {
 		return fmt.Errorf("download URL not found for version %s", resolvedVersion)
 	}
 
-	// Download
-	tmpFile, err := vm.downloadFile(downloadURL, fileSize)
+	sources := BuildDownloadSources(
+		vm.Config.EffectiveDownloadMirror(),
+		vm.parseMajorVersion(resolvedVersion),
+		target.FileName,
+		vm.Config.EffectiveProxy(),
+		target.DownloadURL,
+	)
+	d := newDownloader(&http.Client{Timeout: 10 * time.Minute}, UserAgent())
+	tmpFile, used, err := d.Download(sources, target.FileSize, target.Checksum)
 	if err != nil {
 		return fmt.Errorf("failed to download: %w", err)
 	}
 	defer os.Remove(tmpFile)
+
+	fmt.Printf("Downloaded from %s: %s\n", used.Name, used.URL)
 
 	// Extract
 	installPath := filepath.Join(vm.Config.JDKHome, fmt.Sprintf("jdk-%s", resolvedVersion))
@@ -346,68 +351,6 @@ func (vm *VersionManager) parseMajorVersion(version string) int {
 		return major
 	}
 	return 0
-}
-
-func (vm *VersionManager) downloadFile(url string, expectedSize int64) (string, error) {
-	// Use proxy if configured
-	// Proxy format: prefix the original URL, e.g. "https://ghproxy.net/https://github.com/..."
-	downloadURL := url
-	if vm.Config.Proxy != "" && strings.Contains(url, "github.com") {
-		downloadURL = vm.Config.Proxy + "/" + url
-	}
-
-	// Use a separate client with longer timeout for large file downloads
-	downloadClient := &http.Client{
-		Timeout: 10 * time.Minute,
-	}
-
-	resp, err := downloadClient.Get(downloadURL)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("download failed with status %d (URL: %s)", resp.StatusCode, downloadURL)
-	}
-
-	tmpFile, err := os.CreateTemp("", "jdm-*.zip")
-	if err != nil {
-		return "", err
-	}
-	defer tmpFile.Close()
-
-	// Create progress bar
-	bar := progress.New("Downloading", expectedSize)
-	defer bar.Done()
-
-	// Wrap response body with progress tracking
-	reader := &progressReader{
-		reader: resp.Body,
-		bar:    bar,
-	}
-
-	if _, err := io.Copy(tmpFile, reader); err != nil {
-		return "", err
-	}
-
-	return tmpFile.Name(), nil
-}
-
-// progressReader wraps an io.Reader and updates a progress bar on each Read.
-type progressReader struct {
-	reader io.Reader
-	bar    *progress.ProgressBar
-	total  int64
-}
-
-func (pr *progressReader) Read(p []byte) (n int, err error) {
-	n, err = pr.reader.Read(p)
-	if n > 0 {
-		pr.total += int64(n)
-		pr.bar.Update(pr.total)
-	}
-	return
 }
 
 // Init initializes the version manager (creates directories)

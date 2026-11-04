@@ -9,8 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-04
+
+### Fixed
+
+- `jdm -v` 现在输出真实换行符，此前输出字面 `\n` (IKSYMI)
+
+## [0.1.2] - 2026-11-03
+
 ### Added
 
+- 新增自升级能力：执行任意 jdm 命令时后台探测最新版本（24 小时冷却），发现新版本时在命令输出末尾提示；无新版本、无网络时零输出、零感知 (IKS75M)
+- 新增 `jdm update` 命令：主动检查并升级到最新版本，下载走 Gitee→GitHub 候选链，经 SHA-256 校验（release 附带 `checksums.txt`）通过后替换程序，下次启动生效
+- 升级失败（校验不符、下载失败）不影响现有版本；升级残留的 `.old` 备份在下次启动时自动清理
 - 新增 `jdk_mirror` 下载源配置，默认清华 TUNA；安装时按镜像布局下载，失败或校验不符时依次回退 `proxy` + GitHub、GitHub 直连 (IKRUWJ)
 - 下载按 Adoptium 元数据校验字节数与 SHA-256；镜像返回 HTML、截断文件或摘要不符时判为失败并换源
 - 全部来源失败时汇总每个来源的失败原因；成功时输出实际使用的下载来源
@@ -132,6 +143,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **构建**: `go build -ldflags "-X github.com/xjtuer216/jdm/internal/jdk.Version=X.Y.Z"`
 - **ZIP 解压防逃逸**（Zip Slip 保护）
 
-[Unreleased]: https://github.com/xjtuer216/jdm/compare/v0.1.1...HEAD
-[0.1.1]: https://github.com/xjtuer216/jdm/compare/v0.1.0...v0.1.1
+[Unreleased]: https://github.com/xjtuer216/jdm/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/xjtuer216/jdm/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/xjtuer216/jdm/compare/v0.1.1...v0.1.2
 [0.1.0]: https://github.com/xjtuer216/jdm/releases/tag/v0.1.0

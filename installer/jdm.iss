@@ -7,7 +7,7 @@
 
 #define MyAppName "JDM"
 #ifndef MyAppVersion
-  #define MyAppVersion "0.1.1"
+  #define MyAppVersion "0.1.2"
 #endif
 #define MyAppPublisher "xjtuer216"
 #define MyAppURL "https://github.com/xjtuer216/jdm"

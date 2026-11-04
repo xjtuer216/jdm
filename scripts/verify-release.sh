@@ -81,6 +81,13 @@ for platform in gitee github; do
         [ -n "$want" ] || continue
 
         if ! curl -sfL "$dl/$asset" -o "$TMP/$asset"; then
+            # 下载 CDN 不可达时（如 objects.githubusercontent.com 被墙），
+            # 回退用 release 元数据中的 per-asset digest 核对：GitHub API 资产
+            # 自带 "digest": "sha256:<hex>"。元数据在前面已拉取，无需再联网下载文件。
+            if [ "$platform" = github ] && grep -qF "sha256:$want" "$meta"; then
+                check "$platform: $asset SHA-256 与 $SUMS 一致（API digest 兜底，未逐字节下载）" 0
+                continue
+            fi
             echo "FAIL  $platform: $asset 下载失败"
             FAILED=1
             continue

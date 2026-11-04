@@ -223,6 +223,41 @@ git ls-remote --tags origin
 
 > 标签打在 master 的合并提交上，删除 release 分支不影响标签与制品追溯。
 
+### 2.5 回灌 develop（必做）
+
+PR 合入 master 后，必须把 master 回灌到 develop，否则 develop 缺少发布准备提交（版本徽章、CHANGELOG），下个版本会出现 CHANGELOG 内容重复（v0.1.2 → v0.1.3 之间的实际事故：develop 的 `[Unreleased]` 与 master 的 `[0.1.2]` 小节重复，发版前不得不手工对账去重）。
+
+采用回灌而非"向 master 和 develop 同时开 PR"：发版分支只需一个 PR（→ master），避免同样内容审查两遍；develop 保持单向接收 master 的集成分支角色。
+
+```powershell
+git checkout develop
+git pull origin develop
+git merge origin/master -m "chore(release): 回灌 master v0.1.3 发布提交到 develop"
+# 预期：无冲突（发布准备提交均出自 develop 系历史）
+
+# 验证内容一致（应无输出）
+git diff origin/master develop --stat
+
+git push origin develop
+```
+
+**预期输出**:
+```
+   49b474e..c6930f3  develop -> develop
+```
+
+> 双远程注意：GitHub 上可能因各自独立的 PR 合并提交（`#N` 与 `!N` SHA 不同）导致 `git push github develop` 非快进被拒。此时不要 force push，基于 `github/develop` 做一次同步合并再推：
+>
+> ```powershell
+> git checkout -b sync/github-develop github/develop
+> git merge develop -m "chore(release): 同步 develop 发布提交"
+> git push github sync/github-develop:develop
+> git checkout develop
+> git branch -D sync/github-develop
+> ```
+>
+> 判定标准：`git diff github/develop develop` 无输出即内容一致，仅合并提交 SHA 不同无需强推。
+
 ---
 
 ## 3. 同步代码到 GitHub
@@ -638,6 +673,12 @@ git push origin release/<版本>
 git checkout master && git pull origin master
 git tag -a v<版本> -m "Release v<版本>"
 git push origin v<版本> && git push github v<版本>
+
+# 回灌 develop（见 2.5，必做）：
+git checkout develop && git pull origin develop
+git merge origin/master
+git diff origin/master develop --stat   # 应无输出
+git push origin develop
 
 # === 发布后校验（见 7.1） ===
 ./scripts/verify-release.sh v<版本>

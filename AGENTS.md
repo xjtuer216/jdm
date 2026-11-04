@@ -66,7 +66,6 @@ jdm/
 - **No unregistered commands**: a new Cobra command must be added in `cmd/root.go`.
 - **No swallowed errors**: wrap with `%w`; clean up temp files on failure.
 - **No unrelated deletions**: report dead code instead of removing it during a focused change.
-- **Binary committed**: `core/jdm.exe` is tracked (should be gitignored).
 
 ## UNIQUE STYLES
 - **Symlink switching**: `~/.jdm/current` symlink → active JDK, no env var changes needed.
@@ -85,6 +84,9 @@ cd core && go build -o jdm.exe .
 
 # Build with version
 cd core && go build -ldflags "-X github.com/xjtuer216/jdm/internal/jdk.Version=1.0.0" -o jdm.exe .
+
+# Build installer (non-interactive from Git Bash; plain `cmd //c` is hijacked by CLINK)
+MSYS_NO_PATHCONV=1 cmd.exe /d /c "installer\\build.bat <版本> < nul"
 
 # Tests
 cd core && go test ./...

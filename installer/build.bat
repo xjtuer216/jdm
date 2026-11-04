@@ -17,9 +17,11 @@ echo JDM Installer Build Script
 echo ========================================
 echo.
 
-:: Get version from argument or default
+:: Get version from argument (required)
 if "%~1"=="" (
-    set "VERSION=0.1.2"
+    echo [ERROR] Version argument is required. Usage: build.bat ^<version^>
+    echo Example: build.bat 0.1.3
+    exit /b 1
 ) else (
     set "VERSION=%~1"
 )

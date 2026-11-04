@@ -68,7 +68,7 @@ func Execute() error {
 
 func init() {
 	// Set version template for -v and --version flags
-	rootCmd.SetVersionTemplate(`jdm v{{.Version}}\n`)
+	rootCmd.SetVersionTemplate("jdm v{{.Version}}\n")
 	rootCmd.Version = jdk.GetVersion()
 
 	// jdm version command (as subcommand)

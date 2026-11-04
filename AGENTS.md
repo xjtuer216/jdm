@@ -15,7 +15,7 @@ jdm/
 │   ├── cmd/               # Cobra CLI commands
 │   ├── internal/          # Private packages
 │   └── config.json        # Default config template
-├── scripts/               # check.sh, setup-hooks.sh
+├── scripts/               # check.sh, setup-hooks.sh, verify-release.sh
 ├── .githooks/             # pre-push guardrail
 ├── .github/workflows/     # check workflow (GitHub mirror)
 ├── docs/

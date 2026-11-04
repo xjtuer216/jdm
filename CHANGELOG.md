@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-04
+
+### Fixed
+
+- `jdm -v` 现在输出真实换行符，此前输出字面 `\n` (IKSYMI)
+
 ## [0.1.2] - 2026-11-03
 
 ### Added
@@ -137,7 +143,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **构建**: `go build -ldflags "-X github.com/xjtuer216/jdm/internal/jdk.Version=X.Y.Z"`
 - **ZIP 解压防逃逸**（Zip Slip 保护）
 
-[Unreleased]: https://github.com/xjtuer216/jdm/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/xjtuer216/jdm/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/xjtuer216/jdm/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/xjtuer216/jdm/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/xjtuer216/jdm/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/xjtuer216/jdm/releases/tag/v0.1.0

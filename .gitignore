@@ -25,6 +25,7 @@ docs/*
 !docs/agents/
 !docs/adr/
 !docs/history/
+!docs/RELEASE_OPERATIONS.md
 
 # Installer build outputs
 installer/dist/
